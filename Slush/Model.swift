@@ -44,7 +44,7 @@ class Server:SaveTypeTag {
     var bbsmenuurl = ""
     
     func convertSaveData() -> SaveObject {
-        var savedata = SaveObject()
+        let savedata = SaveObject()
         savedata.title = self.title
         savedata.dataType = self.savetype.rawValue
         return savedata
@@ -69,7 +69,7 @@ class Category:SaveTypeTag {
     var boards = [Board]()
     
     func convertSaveData() -> SaveObject {
-        var savedata = SaveObject()
+        let savedata = SaveObject()
         savedata.title = self.title
         savedata.dataType = self.savetype.rawValue
         return savedata
@@ -100,7 +100,7 @@ class Board:SaveTypeTag {
     //var name = ""
     
     func convertSaveData() -> SaveObject {
-        var savedata = SaveObject()
+        let savedata = SaveObject()
         savedata.title = self.title
         savedata.name = self.name
         savedata.dataType = self.savetype.rawValue
@@ -113,6 +113,20 @@ class Board:SaveTypeTag {
 
 class Thread:SaveTypeTag {
     init() {}
+    init(cast:SaveTypeTag) {
+        let savedata = cast as! Thread
+        self.title = savedata.title
+        self.savetype = .THREAD
+        self.url = savedata.url
+        self.lastRead = savedata.lastRead
+        self.date = savedata.date
+        self.isfav = savedata.isfav
+        self.id = savedata.id
+        self.title = savedata.title
+        self.isSinchaku = savedata.isSinchaku
+        self.res = savedata.res.map{$0}
+    }
+    
     init(savedata:SaveObject) {
         self.title = savedata.title
         self.savetype = .THREAD
@@ -146,7 +160,7 @@ class Thread:SaveTypeTag {
 
     
     func convertSaveData() -> SaveObject {
-        var savedata = SaveObject()
+        let savedata = SaveObject()
         savedata.title = self.title
         savedata.dataType = self.savetype.rawValue
         savedata.url = self.url
@@ -198,13 +212,20 @@ class Res:SaveTypeTag {
         
         for c in copy.treeChildren{
             if(copy.num != c){
-                self.treeChildren.append(copy.num)
+                self.treeChildren.append(c)
             }
         }
+        for c in copy.treeParent{
+            if(copy.num != c){
+                self.treeParent.append(c)
+            }
+        }
+        
         self.treeParent = copy.treeParent
         self.treeDepth = copy.treeDepth
-        
+        self.address = copy.address
         self.title = copy.title
+        self.isSinchaku = copy.isSinchaku
     }
     init(savedata:SaveObject) {
         self.body = savedata.value
@@ -216,6 +237,7 @@ class Res:SaveTypeTag {
         self.isfav = savedata.fav
         self.toRef = Pattern().getAnchor(data: self.body)
         self.title = savedata.value
+        self.address = savedata.url
     }
     
     var savetype: SaveType = .RESPONSE
@@ -225,14 +247,16 @@ class Res:SaveTypeTag {
     var writterName = ""
     var date = Date()
     var isfav = false
-    //安価文字列,実際のインデックス(num-1),深さ
+    //安価文字列,実際のインデックス(num-1)
     var toRef = [(String,[Int])]()
     var treeChildren = [Int]()
     var treeParent = [Int]()
     var treeDepth = 0
     var pictureURL = [String]()
     var movieURL = [String]()
-    var URL = [String]()
+    var address = ""
+    var isAA = false
+    var isSinchaku = false
     
     //非推奨
     var title = ""

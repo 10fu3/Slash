@@ -44,7 +44,7 @@ public class HttpClientImpl {
         
         var string = String.init(data: data, encoding: encode)?.replacingOccurrences(of: "<b>", with: "")
         if((string == nil || string!.count == 0) && encode == .shiftJIS){
-           string = getStringDataWithCP932(data: data).replacingOccurrences(of: "<b>", with: "")
+            string = getStringDataWithCP932(data: data as NSData).replacingOccurrences(of: "<b>", with: "")
         }
         return string?.components(separatedBy: "\n") ?? []
     }
@@ -54,32 +54,62 @@ public class HttpClientImpl {
         
         var string = String.init(data: data, encoding: encode)?.replacingOccurrences(of: "<b>", with: "")
         if((string == nil || string!.count == 0) && encode == .shiftJIS){
-            string = getStringDataWithCP932(data: data).replacingOccurrences(of: "<b>", with: "")
+            string = getStringDataWithCP932(data: data as NSData).replacingOccurrences(of: "<b>", with: "")
         }
         return string ?? ""
     }
     
-    public func getStringDataWithCP932(data:Data)->String{
-        var testArray = [UInt8]()
-        for i in data{
-            testArray.append(i)
-            if(String(bytes: testArray, encoding: .shiftJIS) == nil){
-                testArray.remove(at: testArray.count-1)
+    public func getStringDataWithCP932(data:NSData)->String{
+        let SJISMultiCheck :(UInt8)->Bool = {c in
+            if(((c>=0x81)&&(c<=0x9f))||((c>=0xe0)&&(c<=0xfc))){
+                return true
+            }else{
+                return false
             }
         }
-        return String(bytes: testArray, encoding: .shiftJIS) ?? ""
+        
+        var result = ""
+        var byte = [UInt8](repeating: 0, count: 1)
+        
+        var temp = [UInt8]()
+        
+        let length = data.count / MemoryLayout<UInt8>.size
+        
+        var count = 0
+        while count<length {
+            
+            var flag = true
+            
+            while flag {
+                temp = []
+                data.getBytes(&byte, range: NSRange(location: count, length: MemoryLayout<UInt8>.size))
+                temp.append(byte[0])
+                if(SJISMultiCheck(temp[0])){
+                    //下の行が実行された段階でbyteの中身は更新される
+                    data.getBytes(&byte, range: NSRange(location: count+1, length: MemoryLayout<UInt8>.size))
+                    temp.append(byte[0])
+                    count += MemoryLayout<UInt8>.size
+                }
+                let line = String(bytes: temp, encoding: String.Encoding.shiftJIS) ?? "�"
+                
+                if(line.count > 0){
+                    flag = false
+                    result += line
+                    //print(line)
+                }
+                
+                count += MemoryLayout<UInt8>.size
+            }
+        }
+        return result
     }
     
     public func getDatafromHTTP(url:String) -> Data {
-        do{
-            let url = URL(string: url)!
-            let req = NSMutableURLRequest(url: url)
-            let (rawdata, _, _) = execute(request: (req as URLRequest))
-            if rawdata != nil{
-                return Data.init(referencing: rawdata ?? NSData())
-            }
-        }catch let err {
-            return Data()
+        let url = URL(string: url)!
+        let req = NSMutableURLRequest(url: url)
+        let (rawdata, _, _) = execute(request: (req as URLRequest))
+        if rawdata != nil{
+            return Data.init(referencing: rawdata ?? NSData())
         }
         return Data()
     }

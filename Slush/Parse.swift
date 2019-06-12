@@ -37,18 +37,42 @@ extension String {
 
 class Pattern {
     static let pettern = Pattern()
-    let anchorRegex:NSRegularExpression = try! NSRegularExpression(pattern: "(((>>?|＞＞?)\\d+(\\s*(>>?|＞＞?|,|-)\\d+){0,})|(>>?|＞＞?)(\\d+)-(\\d+)|(>>?|＞＞?)\\d+((>>?|＞＞?|,|-)\\d+)+)", options: .caseInsensitive)
-    let resCountRegex:NSRegularExpression = try! NSRegularExpression(pattern: "\\(.+?\\)", options: .caseInsensitive)
+    static let anchorRegex:NSRegularExpression = try! NSRegularExpression(pattern: "(((>>?|＞＞?)\\d+(\\s*(>>?|＞＞?|,|-)\\d+){0,})|(>>?|＞＞?)(\\d+)-(\\d+)|(>>?|＞＞?)\\d+((>>?|＞＞?|,|-)\\d+)+)", options: .caseInsensitive)
+    static let resCountRegex:NSRegularExpression = try! NSRegularExpression(pattern: "\\(.+?\\)", options: .caseInsensitive)
     
-    let httpregex = try! NSRegularExpression(pattern: "https?://([\\w-]+\\.)+[\\w-]+(/[\\w-./?%&=]*)?$", options: .caseInsensitive)
-    let ttpregex = try! NSRegularExpression(pattern: "ttps?://([\\w-]+\\.)+[\\w-]+(/[\\w-./?%&=]*)?$", options: .caseInsensitive)
-    let pictureRegex = try! NSRegularExpression(pattern: "https?:\\S+\\.+(jpg|jpeg|gif|png|bmp|JPG|JPEG|GIF|PNG|BMP)(?!\\S)", options: .caseInsensitive)
-    let movieRegex = try! NSRegularExpression(pattern: "https?:\\S+\\.+(mp4|MP4|m4a|M4A|mov|MOV|qt|QT|mpeg|MPEG|mpg|MPG|vob|VOB|avi|AVI|asf|ASF|wmv|WMV|webm|WEBM|flv|FLV|mkv|MKV)(?!\\S)", options: .caseInsensitive)
+    static let categoryTitle = try! NSRegularExpression(pattern: "(?i)<BR><BR><B>(.+?)</B><BR>", options: [])
+    
+    static let boardurl = try! NSRegularExpression(pattern: "<A HREF=(.+?)>", options: [])
+    static let boardname = try! NSRegularExpression(pattern: "/>(.+?)</A>", options: [])
+
+    
+    static let httpregex = try! NSRegularExpression(pattern: "https?://([\\w-]+\\.)+[\\w-]+(/[\\w-./?%&=]*)?$", options: .caseInsensitive)
+    static let ttpregex = try! NSRegularExpression(pattern: "ttps?://([\\w-]+\\.)+[\\w-]+(/[\\w-./?%&=]*)?$", options: .caseInsensitive)
+    static let pictureRegex = try! NSRegularExpression(pattern: "https?:\\S+\\.+(jpg|jpeg|gif|png|bmp|JPG|JPEG|GIF|PNG|BMP)(?!\\S)", options: .caseInsensitive)
+    static let movieRegex = try! NSRegularExpression(pattern: "https?:\\S+\\.+(mp4|MP4|m4a|M4A|mov|MOV|qt|QT|mpeg|MPEG|mpg|MPG|vob|VOB|avi|AVI|asf|ASF|wmv|WMV|webm|WEBM|flv|FLV|mkv|MKV)(?!\\S)", options: .caseInsensitive)
+    
+    static let numpattern = try! NSRegularExpression(pattern: "<span class=\"number\">(.+?)</span>", options: [])
+    static let idpattern = try! NSRegularExpression(pattern: "<span class=\"uid\">(.+?)</span>", options: [])
+    static let namepattern = try! NSRegularExpression(pattern: "<span class=\"name\"><b>(.+?)</b>", options: [])
+    static let datepattern = try! NSRegularExpression(pattern: "<span class=\"date\">(.+?)</span>", options: [])
+    static let bodypattern = try! NSRegularExpression(pattern: "<div class=\"message\"><span class=\"escaped\">(.+?)</span>", options: [])
+    static let mailpattern = try! NSRegularExpression(pattern: "<a href=\"mailto:(.+?)\">", options: [])
     
     func detectEncoding(data: NSData) -> String.Encoding {
         return String.Encoding(rawValue: NSString.stringEncoding(
             for: data as Data, encodingOptions: nil, convertedString: nil, usedLossyConversion: nil))
     }
+    
+    static func pattern(pattern:NSRegularExpression,target:String) -> [String]{
+        let matches = pattern.matches(in: target, options: [], range: NSMakeRange(0, target.count))
+        
+        var results: [String] = []
+        matches.forEach { (match) -> () in
+            results.append( (target as NSString).substring(with: match.range(at: 1)) )
+        }
+        return results
+    }
+    
     
     func encodingNameFromNSStringEncoding(encoding: String.Encoding) -> String {
         return String(CFStringConvertEncodingToIANACharSetName(
@@ -56,7 +80,7 @@ class Pattern {
     }
     
     func getAnchorMatch(data:String) -> [String] {
-        let matches = anchorRegex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
+        let matches = Pattern.anchorRegex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
         
         var results: [String] = []
         matches.forEach { (match) -> () in
@@ -66,7 +90,7 @@ class Pattern {
     }
     
     func getPictureLink(data:String) -> [String] {
-        let matches = pictureRegex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
+        let matches = Pattern.pictureRegex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
         
         var results: [String] = []
         matches.forEach { (match) -> () in
@@ -76,7 +100,7 @@ class Pattern {
     }
     
     func getMovieLink(data:String) -> [String] {
-        let matches = pictureRegex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
+        let matches = Pattern.pictureRegex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
         
         var results: [String] = []
         matches.forEach { (match) -> () in
@@ -86,14 +110,14 @@ class Pattern {
     }
     
     func getUrlLink(data:String) -> [String] {
-        let matches = httpregex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
+        let matches = Pattern.httpregex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
         
         var results: [String] = []
         matches.forEach { (match) -> () in
             results.append( (data as NSString).substring(with: match.range(at: 0)) )
         }
         
-        let matches1 = ttpregex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
+        let matches1 = Pattern.ttpregex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
 
         matches1.forEach { (match) -> () in
             results.append( (data as NSString).substring(with: match.range(at: 0)) )
@@ -123,7 +147,6 @@ class Pattern {
         for k in parsedata{
             
             let sepanc = k.replacingOccurrences(of: " ", with:"").replacingOccurrences(of: "\n", with: "").components(separatedBy: ">>")
-            
             warp: for i in sepanc{
                 if(i.count <= 0){
                     continue
@@ -135,29 +158,28 @@ class Pattern {
                     if(sepalatebar.count >= 2){
                         let count = Int.init(sepalatebar[0])
                         let count1 = Int.init(sepalatebar[sepalatebar.count-1])
-                        if(count ?? 1 >= 1 && count1 ?? 1 >= 1){
+                        if(count == nil || count1 == nil){
+                            continue warp
+                        }else if(count ?? 0 >= 1 && count1 ?? 0 >= 1){
                             var range = ((Array<Int>)(0...1))
                             if(count! < count1!){
                                 range = ((Array<Int>)((count!-1)...(count1!-1)))
                             }else{
                                 range = ((Array<Int>)((count1!-1)...(count!-1)))
                             }
-                            if(range.count >= 30){
-                                //死ねごみ安価ゴミガイジ
-                                continue warp
-                            }
                             range.removeAll(where: {$0 == 0})
+                            
                             put.1.append(contentsOf: range)
                         }
                     }else{
-                        let count = (Int.init(sepalatebar[0]) ?? 1)
-                        if(count >= 0){
+                        let count = (Int.init(sepalatebar[0]) ?? 0)
+                        if(count >= 1){
                             put.1.append(count-1)
                         }
                     }
                     
                 }
-                if(!put.1.contains(0)){
+                if(!put.1.contains(-1) && !(put.1.count >= 9)){
                     array.append(put)
                 }
             }
@@ -176,27 +198,32 @@ class Parse {
         jpDateFormater.dateFormat = "yyyy/MM/dd(EEE)HH:mm:ss"
         
     }
-    
-    func setRelationParentRes(raw:[Res]) -> [Res] {
+    static func setRelationParentRes(raw:[Res]) -> [Res] {
         
         let refres = raw.filter{$0.toRef.count > 0}
-        
-        print("以下はどこかのレスを参照しているレス")
-        print(refres.map{String($0.num)}.joined(separator: ","))
-        
         for res in refres{
             for refs in res.toRef{
                 for ref in refs.1{
-                    //参照先
-                    //>>2018みたいなやつを無効にする
-                    if((raw.count-1) >= ref){
-                        let refd = raw[ref]
-                        if(!refd.treeChildren.contains(res.num-1)){
-                            refd.treeChildren.append(res.num-1)
+                    var refd:Res
+                    if(ref > raw.count){
+                        let temp = raw.filter{$0.num == ref}.first
+                        if(temp != nil){
+                            refd = temp!
+                        }else{
+                            continue
                         }
-                        if(!res.treeParent.contains(refd.num-1)){
-                            res.treeParent.append(refd.num-1)
-                        }
+                    }else{
+                        refd = raw[ref]
+                    }
+                    if(res.num == refd.num){
+                        continue
+                    }
+                    
+                    if(!refd.treeChildren.contains(res.num)){
+                        refd.treeChildren.append(res.num)
+                    }
+                    if(!res.treeParent.contains(refd.num)){
+                        res.treeParent.append(refd.num)
                     }
                 }
             }
@@ -204,21 +231,111 @@ class Parse {
         
         return raw
     }
+
+    
+    func parseTreeArrayPartOfUpdate(old:[Res], update:[Res]) -> [Res]{
+        
+        var display = [Res]()
+        let updateNum = update.map{$0.num}
+        var oldNum = old.map{$0.num}
+        print(updateNum)
+        var totaldatas = [Res]()
+        old.forEach{totaldatas.append($0)}
+        update.forEach{totaldatas.append($0)}
+        totaldatas = Parse.setRelationParentRes(raw: totaldatas)
+        
+        
+        let forScan: (([Res],Int)->Int?) = {(raw:[Res],target:Int) -> (Int?) in
+            var index:Int? = nil
+            for arrayIndex in 0 ..< raw.count{
+                if(raw[arrayIndex].num == target){
+                    index = arrayIndex
+                }
+            }
+            return index
+        }
+        
+        var f: ((Res,Int) -> Void)? = nil
+        
+        f = {(res:Res,deepLev:Int) -> () in
+            //var cache = Res()
+            for i in res.treeChildren{
+                if(i == res.num){
+                    continue
+                }
+                guard let index = forScan(update,i) else {
+                    continue
+                }
+                let pick = Res(cast: update[index] as SaveTypeTag)
+                if(!updateNum.contains(pick.num)){
+                    continue
+                }
+                pick.treeDepth = deepLev
+                if(pick.treeChildren.count > 0){
+                    display.append(pick)
+                    f!(pick,deepLev+1)
+                }else{
+                    display.append(pick)
+                }
+            }
+        }
+        
+        for i in update{
+            var isSearchedOld = false
+            for j in i.toRef{
+                for k in j.1{
+                    let index = forScan(old,k+1)
+                    if(index != nil && oldNum.contains(old[index!].num)){
+                        oldNum.removeAll(where: {$0 == old[index!].num})
+                        display.append(Res(cast: old[index!] as SaveTypeTag))
+                        f!(old[index!],1)
+                    }
+                }
+                isSearchedOld = true
+            }
+            if(!isSearchedOld){
+                display.append(i)
+                f!(i,1)
+            }
+            
+        }
+        return display
+    }
     
     func parseTreeArray(raw:[Res]) -> [Res] {
         var values = [Res]()
+        let forScan: (([Res],Int)->Int?) = {(raw:[Res],target:Int) -> (Int?) in
+            var index:Int? = nil
+            for arrayIndex in 0 ..< raw.count{
+                if(raw[arrayIndex].num == target){
+                    index = arrayIndex
+                }
+            }
+            return index
+        }
         
         var f: ((Res,Int) -> Void)? = nil
         f = {(res:Res,deepLev:Int) -> () in
-            var cache = Res()
+
+            //var cache = Res()
             for i in res.treeChildren{
-                cache = raw[i]
-                cache.treeDepth = deepLev
-                if(cache.treeChildren.count > 0){
-                    values.append(cache)
-                    f!(cache,deepLev+1)
+                if(i == res.num){
+                    continue
+                }
+                
+                guard let index = forScan(raw,i) else{
+                    continue
+                }
+                
+                let pick = Res(cast: raw[index] as SaveTypeTag)
+                
+                
+                pick.treeDepth = deepLev
+                if(pick.treeChildren.count > 0){
+                    values.append(pick)
+                    f!(pick,deepLev+1)
                 }else{
-                    values.append(cache)
+                    values.append(pick)
                 }
             }
         }
@@ -234,97 +351,6 @@ class Parse {
         
         return values
     }
-    
-//    func setRerationParentRes(raw:[Res]) -> [Res] {
-//        for res in raw{
-//            for refs in res.toRef{
-//                for ref in refs.1{
-//                    if(raw.count >= ref){
-//                        if(res.num != ref){
-//                            raw[ref].treeChildren.append(res.num-1)
-//                            res.treeParent = raw[ref].num
-//                            var deep = 0
-//                            var targetRes:Res? = raw[ref]
-//                            while targetRes != nil{
-//                                deep += 1
-//                                if(targetRes?.treeParent != nil){
-//                                    targetRes = raw[targetRes?.treeParent ?? 0]
-//                                }else{
-//                                    targetRes = nil
-//                                }
-//                            }
-//                            res.treeDepth = deep
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//        return raw
-//    }
-//
-//    func testparseTreeArray(raw:[Res]) -> [Res] {
-//        //let copyarray = raw.map{Res(cast: $0 as SaveTypeTag)}
-//        var value = [Res](repeating: Res(), count: raw.count)
-//        raw.forEach{
-//            value[$0.num-1] = Res(cast: $0)
-//        }
-//        var sort = [Res]()
-//        var f: ((Res) -> Void)? = nil
-//        f = {(res:Res) -> () in
-//            var cache = Res()
-//            for i in res.treeChildren{
-//                //print(i-1)
-//                cache = raw[i]
-//                if(cache.treeChildren.count > 0){
-//                    sort.append(cache)
-//                    f!(cache)
-//                }else{
-//                    sort.append(cache)
-//                }
-//            }
-//        }
-//
-////        //親子関係の設定
-////        for res in value{
-////            for refs in res.toRef{
-////                for ref in refs.1{
-////                    if(value.count >= ref){
-////                        if(res.num != ref){
-////                            value[ref-1].treeChildren.append(res)
-////                            res.treeParent = value[ref-1]
-////                            var deep = 0
-////                            var targetRes:Res? = value[ref-1]
-////                            while targetRes != nil{
-////                                deep += 1
-////                                targetRes = targetRes!.treeParent
-////                            }
-////                            res.treeDepth = deep
-////                        }
-////                    }
-////                }
-////            }
-////        }
-//
-//        for res in value{
-//            if(res.treeDepth == 0 && res.treeChildren.count > 0 && res.treeParent == nil){
-//                sort.append(res)
-//                f!(res)
-//            }else if(res.treeDepth == 0 && res.treeChildren.count == 0){
-//                sort.append(res)
-//            }
-//        }
-//        sort.forEach{
-//            var space = ""
-//            for _ in 0 ..< $0.treeDepth{
-//                space += " "
-//            }
-//            print(space+String($0.num))
-//        }
-//
-//        return sort
-//
-//    }
-
     
     static func getMatch(data:String,pattern:String) -> [String] {
         let regex = try! NSRegularExpression(pattern: pattern, options: .caseInsensitive)
@@ -346,139 +372,46 @@ class Parse {
         if(thread.url.contains("5ch.net")){
             return update5chThread(thread: thread)
         }else{
-            return thread
+            return updateDatThread(thread: thread)
         }
+    }
+    
+    func updateDatThread(thread:Thread) -> Thread {
+        let downloaded = getThreadByDat(url: thread.url,isUpdate: thread)
+        let data = Thread(cast: thread)
+        if(downloaded.res.count - thread.res.count) > 0{
+            data.res = downloaded.res[thread.res.count..<downloaded.res.count].map{$0}
+        }else{
+            data.res = []
+        }
+        return data
     }
     
     func update5chThread(thread:Thread) -> Thread {
-        //let urlGroup = thread.url.components(separatedBy: "/")
-        
-        //let base = Ji(htmlURL: URL(string: url)!)
-        //print(thread.url)
         let rangeUrl = thread.url+"/"+String(thread.res.count+1)+"-n"
-        let rawdata = HttpClientImpl().getDataByUrl(url: rangeUrl)
         
-        
-        let shitJIS:String = HttpClientImpl().getStringData(url: rangeUrl, encode: .shiftJIS)
-        //var utf8 = String(data: rawdata,encoding: String.Encoding.) ?? ""
-        //        for i in rawdata{
-        //            print(i)
-        //        }
-        //
-        
-        let base = (shitJIS ).replacingOccurrences(of:"<br>" , with: "\n")
-        
-        
-        let parseLine1 = Ji(htmlString: base)
-        var responses = parseLine1?.xPath("/html/body/div[1]/div[5]")//スレタグの取得
-        
-        if(responses?.first?["class"] == "stoplight stopred stopdone"){
-            thread.isDown = true
-            responses = parseLine1?.xPath("/html/body/div[1]/div[6]")
-        }else if(responses?.first?["class"] == "stoplight stopyellow"){
-            responses = parseLine1?.xPath("/html/body/div[1]/div[6]")
-        }
-        
-        var edited = false
-        responses?.forEach{
-            let a = $0
-            //print(a.children.count)
-            for i in a.children{
-                let idname = i["id"] ?? ""
-                if(idname == "banner"){
-                    continue
-                }
-                for j in i.children{
-                    if(j.children.count >= 4){//タグの数が4個のときは本文以外の情報が含まれる
-                        
-                        let res = Res()
-                        let num = j.children[0].content!
-                        let name = j.children[1].content!
-                        let date = j.children[2].content!
-                        let rawid = j.children[3].content!
-                        let splitid = rawid.split(separator: ":")
-                        var id = ""
-                        if(splitid.count == 2){
-                            id = String(splitid[1])
-                        }else{
-                            id = ""
-                        }
-                        
-                        res.date = self.jpDateFormater.date(from:String(date.prefix(date.count-3))) ?? Date()
-                        res.writterName = name
-                        res.writterId = String(id)
-                        res.num = Int(num) ?? 0
-                        if (res.num == 0){
-                            continue
-                        }else{
-                            if edited == false{
-                                edited = true
-                            }
-                            thread.res.append(res)
-                        }
-                        
-                    }else if(j.children.count == 1){//タグの数が1個のときは本文の情報が含まれる
-                        let body = j.children[0].content!
-                        //print(thread.responses.count-1)
-                        thread.res[thread.res.count-1].body = body
-                        thread.res[thread.res.count-1].toRef = Pattern().getAnchor(data: body)
-                        thread.res[thread.res.count-1].movieURL = Pattern().getMovieLink(data: body)
-                        thread.res[thread.res.count-1].pictureURL = Pattern().getPictureLink(data: body)
-                    }
-                }
-            }
-        }
-        if(edited == true){
-            thread.res = setRelationParentRes(raw: thread.res)
-        }
-        return thread
+        return get5chThreadByUrl(url: rangeUrl, onDownload: nil, onParse: nil, onError: nil)
     }
-    
-    func getThreadsBy5ch(boardUrl:String) -> Board {
-        let board = Board()
-        let sepalateUrlShash = boardUrl.components(separatedBy: "/")
-        board.name = sepalateUrlShash[sepalateUrlShash.count > 1 ? sepalateUrlShash.count-2 : 0]
-        let titles = boardUrl+"subback.html"
-        let base = Ji(htmlURL: URL(string:titles)!)
-        
-        for i in base?.xPath("//*[@id=\"trad\"]") ?? [JiNode](){
-            let thread = Thread()
-            let nonParseURL = i["href"] ?? ""//l50が入ってるURL
-            let number = nonParseURL.count
-            if(number == 0){
-                continue
-            }
-            let parsedUrl = nonParseURL.prefix(number-3)//l50を削ったやつ
 
-            var urlcomp = boardUrl.replacingOccurrences(of: "http://", with: "").replacingOccurrences(of: "https://",with: "").components(separatedBy:"/")
-            thread.url = "http://"+urlcomp[0]+"/test/read.cgi/"+urlcomp[1..<urlcomp.count].joined(separator:"/")+parsedUrl
-
-            let rawtitle = i.content?.components(separatedBy: " ") ?? []
-            var title = ""
-
-            for i in 0 ..< rawtitle.count{
-                if(i != 0 && i != (rawtitle.count-1)){
-                    title += rawtitle[i]
-                }
-            }
-            thread.title = title
-
-            board.nowThread.append(thread)
-        }
-        
-        return board
-        
-    }
     
     func getThreads(boardUrl:String) -> Board {
-        var board = Board()
+        let board = Board()
         let sepalateUrlShash = boardUrl.components(separatedBy: "/")
         board.name = sepalateUrlShash[sepalateUrlShash.count > 1 ? sepalateUrlShash.count-2 : 0]
         let titles = boardUrl+"subject.txt"
         let cgiurl = boardUrl.replacingOccurrences(of: board.name+"/", with: "")+"test/read.cgi/"+board.name+"/"
         //print(titles)
         
-        let lines:[String] = HttpClientImpl().getStringData(url: titles, encode: .shiftJIS)
+        let data = HttpClientImpl().getDatafromHTTP(url: titles)
+        
+        var shitJIS:String = String(data: data, encoding: .shiftJIS) ?? ""
+        
+        if(shitJIS.count == 0){
+            shitJIS = HttpClientImpl().getStringDataWithCP932(data: data as NSData)
+        }
+        
+        let lines:[String] = shitJIS.components(separatedBy: "\n")
+        
         
         for line in lines{
             let datAndTitle = line.components(separatedBy: "<>")
@@ -498,111 +431,121 @@ class Parse {
         return board
     }
     
+    
+    
     func getCategoryAndBoard(url:String) -> [Category] {
         var categories = [Category]()
         
-        let base = Ji(htmlURL: URL(string: url)!)
-        var nowSearchSmallCategoryAllow = false//5chの最初の余計なタグをスキップするためのフラグ
-        var childrens = base?.xPath("/html/body/font")?.first?.children
+        let data = HttpClientImpl().getDatafromHTTP(url: url)
         
-        if(childrens == nil){
-            childrens = base?.xPath("/html/body/small")?.first?.children
+        var str:String = String(data: data, encoding: .shiftJIS) ?? ""
+        
+        if(str.count == 0){
+            
+            str = HttpClientImpl().getStringDataWithCP932(data: data as NSData)
+            if(str.count == 0){
+                print("Error")
+            }
         }
         
-        for i in childrens ?? [JiNode](){
-            if(i.tagName == "b") && (i["href"] == nil){//大カテゴリーのヒット条件
-                let b = Category()
-                b.savetype = .CATEGORY
-                b.title = i.content!
-                categories.append(b)
-                nowSearchSmallCategoryAllow = true//もし地震タグが先頭にある場合、先にBタグがヒットするため
-            }
-            if(i.tagName == "a") && (i["href"] != nil) && (i.content != "") && (nowSearchSmallCategoryAllow){//余計なタグはここで引っかかる
-                let b = Board()
-                b.title = i.content!
-                b.url = i["href"]!
-                categories[categories.count-1].boards.append(b)
+        for line in str.components(separatedBy: "\n"){
+            let rawtitle = Pattern.pattern(pattern: Pattern.categoryTitle, target: line)
+            let category = Category()
+            if(rawtitle.count > 0){
+                let title = rawtitle[0]
+                category.title = title
+                categories.append(category)
+            }else if categories.count > 0{
+                let lastAppendCategory = categories[categories.count-1]
+                let board = Board()
+                let rawurl = Pattern.pattern(pattern: Pattern.boardurl, target: line)
+                let rawname = Pattern.pattern(pattern: Pattern.boardname, target: line)
+                if(rawurl.count > 0){
+                    let url = rawurl[0]
+                    board.url = url
+                }
+                if(rawname.count > 0){
+                    let name = rawname[0]
+                    board.title = name
+                }
+                if(board.title.count > 0 && board.url.count > 0){
+                    lastAppendCategory.boards.append(board)
+                }
             }
         }
         return categories
     }
     
-    func get5chThreadByURL(url:String,onDownload:(()->Void)?,onParse:((Int,Int)->Void)?,onError:(()->Void)?)->Thread{
+    func get5chThreadByUrl(url:String,onDownload:(()->Void)?,onParse:((Int,Int)->Void)?,onError:(()->Void)?) -> Thread {
+        //var isFirstRes = false
+        var updatedata = [Res]()
+        
         let thread = Thread()
         
         let urlGroup = url.components(separatedBy: "/")
         
         onDownload?()
-        let shitJIS:String = HttpClientImpl().getStringData(url: url, encode: .shiftJIS)
+        let data = HttpClientImpl().getDatafromHTTP(url: url)
         
-        if(shitJIS.count == 0){
-            onError?()
-            return thread
+        var str:String = String(data: data, encoding: .shiftJIS) ?? ""
+        
+        if(str.count == 0){
+            str = HttpClientImpl().getStringDataWithCP932(data: data as NSData)
+            //str = String(data: data, encoding: .iso2022JP) ?? ""
+            if(str.count == 0){
+                onError?()
+                
+                return thread
+            }
         }
         
-        let base = (shitJIS ?? "").replacingOccurrences(of:"<br>" , with: "\n")
-        
-        
-        let parseLine1 = Ji(htmlString: base)
-        var responses = parseLine1?.xPath("/html/body/div[1]/div[5]")//スレタグの取得
-        
-        if(responses?.first?["class"] == "stoplight stopred stopdone"){
+        if str.contains("<div class=\"toplight stopred stopdone\">"){
             thread.isDown = true
-            responses = parseLine1?.xPath("/html/body/div[1]/div[6]")
-        }else if(responses?.first?["class"] == "stoplight stopyellow"){
-            responses = parseLine1?.xPath("/html/body/div[1]/div[6]")
         }
-        var count = 0
-        responses?.forEach{
-            let a = $0
-            //print(a.children.count)
-            for i in a.children{
-                let idname = i["id"] ?? ""
-                if(idname == "banner"){
-                    continue
+        
+        str = str.replacingOccurrences(of: "<span class=\"uid\"></span>", with: "<span class=\"uid\"><$EMPTY$></span>")
+        
+        let numArray = Pattern.pattern(pattern: Pattern.numpattern, target: str)
+        let idArray = Pattern.pattern(pattern: Pattern.idpattern, target: str)
+        let nameArray = Pattern.pattern(pattern: Pattern.namepattern, target: str)
+        let dateArray = Pattern.pattern(pattern: Pattern.datepattern, target: str)
+        let bodyArray = Pattern.pattern(pattern: Pattern.bodypattern, target: str)
+        
+        if numArray.count ==  dateArray.count && numArray.count == bodyArray.count {
+            
+            for i in 0 ..< numArray.count{
+                onParse?(i+1,numArray.count)
+                let res = Res()
+                res.num = Int(numArray[i]) ?? 0
+                res.writterId = idArray[i] == "<$EMPTY$>" ? "" : idArray[i].replacingOccurrences(of: "ID:", with: "")
+                if(nameArray[i].contains("mailto:")){
+                    //ここから
+                    let address = Pattern.pattern(pattern: Pattern.mailpattern, target: nameArray[i])[0]
+                    var name = nameArray[i].replacingOccurrences(of: "<a href=\"mailto:"+address+"\">", with: "")
+                    name = String(htmlEncodedString: name.replacingOccurrences(of: "</a>", with: ""))
+                    //ここまでが下処理
+                    
+                    res.address = address
+                    res.writterName = name
+                    
+                }else{
+                    res.writterName = nameArray[i]
                 }
-                count += 1
-                onParse?(count,a.children.count)
-                for j in i.children{
-                    if(j.children.count >= 4){//タグの数が4個のときは本文以外の情報が含まれる
-                        
-                        let res = Res()
-                        let num = j.children[0].content!
-                        let name = j.children[1].content!
-                        let date = j.children[2].content!
-                        let rawid = j.children[3].content!
-                        let splitid = rawid.split(separator: ":")
-                        var id = ""
-                        if(splitid.count == 2){
-                            id = String(splitid[1])
-                        }else{
-                            id = ""
-                        }
-                        
-                        res.date = self.jpDateFormater.date(from:String(date.prefix(date.count-3))) ?? Date()
-                        res.writterName = name
-                        res.writterId = String(id)
-                        res.num = Int(num) ?? 0
-                        if (res.num == 0){
-                            continue
-                        }else{
-                            thread.res.append(res)
-                        }
-                        
-                    }else if(j.children.count == 1){//タグの数が1個のときは本文の情報が含まれる
-                        let body = j.children[0].content!
-                        //print(thread.responses.count-1)
-                        thread.res[thread.res.count-1].body = body
-                        thread.res[thread.res.count-1].toRef = Pattern().getAnchor(data: body)
-                        thread.res[thread.res.count-1].movieURL = Pattern().getMovieLink(data: body)
-                        thread.res[thread.res.count-1].pictureURL = Pattern().getPictureLink(data: body)
-                    }
-                }
+                
+                res.date = jpDateFormater.date(from: dateArray[i]) ?? Date()
+                let body = String(htmlEncodedString: bodyArray[i])
+                res.body = body
+                res.toRef = Pattern().getAnchor(data: res.body)
+//                if(isFirstRes == false){
+//                    res.isSinchaku = true
+//                    isFirstRes = true
+//                }
+                thread.res.append(res)
             }
         }
         let threadborn = TimeInterval.init(urlGroup[urlGroup.count-1].replacingOccurrences(of: ".dat", with: "")) ?? 0
         thread.date = Date(timeIntervalSince1970: threadborn)
-        thread.res = setRelationParentRes(raw: thread.res)
+        thread.res = Parse.setRelationParentRes(raw: thread.res)
         
         return thread
     }
@@ -626,20 +569,22 @@ class Parse {
     
     func getThread(url:String,onDownload:(()->Void)?,onParse:((Int,Int)->Void)?,onError:(()->Void)?) -> Thread {
         if(url.contains("5ch.net")){
-            return get5chThreadByURL(url: url,onDownload: onDownload,onParse: onParse,onError: onError)
+            return get5chThreadByUrl(url: url,onDownload: onDownload,onParse: onParse,onError: onError)
         }
-        return getThreadByDat(url: url)
+        return getThreadByDat(url: url,isUpdate: nil)
     }
     
-    func getThreadByDat(url:String) -> Thread {
+    func getThreadByDat(url:String,isUpdate:Thread?) -> Thread {
         let thread = Thread()
+        
+        var isFirstRes = false
         
         let urlGroup = url.replacingOccurrences(of: "test/read.cgi/", with: "").components(separatedBy: "/")
         let threadnumber = urlGroup[urlGroup.count-1]
         let datUrl = urlGroup[0]+"//"+urlGroup[2]+"/"+urlGroup[urlGroup.count-2]+"/dat/"+urlGroup[urlGroup.count-1]+".dat"
         var responses = [Res]()
         
-        var parseUrl = datUrl
+        let parseUrl = datUrl
         if(!parseUrl.hasSuffix(".dat")){
             //parseUrl += ".dat"
         }
@@ -681,10 +626,14 @@ class Parse {
             resvar.toRef = Pattern().getAnchor(data: resvar.body)
             resvar.writterName = res[0].replacingOccurrences(of: "</b>", with: "")
             
+            if(isFirstRes == false){
+                resvar.isSinchaku = true
+                isFirstRes = true
+            }
             responses.append(resvar)
             
         }
-        thread.res = setRelationParentRes(raw: responses)
+        thread.res = Parse.setRelationParentRes(raw: responses)
         thread.url = url
         let threadborn = TimeInterval.init(urlGroup[urlGroup.count-1].replacingOccurrences(of: ".dat", with: "")) ?? 0
         thread.date = Date(timeIntervalSince1970: threadborn)

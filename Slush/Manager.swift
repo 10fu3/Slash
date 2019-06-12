@@ -28,8 +28,12 @@ class SearchFilter {
             case .ANCHOR:
                 var values = [Res]()
                 for i in 0..<searchNum.count{
-                    for index in sourceRes?.toRef[i].1 ?? []{
-                        values.append(rawRes[index])
+                    for res in rawRes{
+                        if(res.num == searchNum[i]+1){
+                            if(!values.contains{$0.num == res.num}){
+                                values.append(res)
+                            }
+                        }
                     }
                 }
                 return values
@@ -57,10 +61,8 @@ class SearchFilter {
                 var values :[Res] = []
                 for i in rawRes{
                     if(i.num) == searchNum[0]{
-                        let index = i.num
                         for resIndex in i.treeChildren{
-                            let re = resIndex
-                            values.append(rawRes[resIndex])
+                            values.append(rawRes[resIndex-1])
                         }
                     }
                 }
@@ -95,95 +97,7 @@ class Manager {
     var downloadedData = [Server]()
     
     var views = [SuperTable]()
-    
-    func createCell(_ index:Int,_ view:SuperTable) -> UITableViewCell {
-        let mode = view.tableMode
-        var cell:UITableViewCell? = nil
-        if(mode != nil){
-            switch view.tableMode! {
-                case .SERVER_LIST:
-                    view.tableMode = .CATEGORY_LIST
-                    cell = view.cellGetter?("basic")
-                    let custom = cell as? BasicCell
-                    let data = view.displayView![index] as! Server
-                    custom?.title.text = data.title
-                    custom?.onCellTouch = { i in
-                        let j = i as! Category
-                        let nextVC = view.storyboard?.instantiateViewController(withIdentifier: "table") as? SuperTable
-                        nextVC?.isFirst = false
-                        nextVC?.displayView = j.boards
-                        if(nextVC != nil){
-                            view.navigationController?.present(nextVC!, animated: true, completion: nil)
-                            //view.present(nextVC!, animated: true, completion: nil)
-                        }
-                    }
-                    
-                    break
-                case .BOARD_LIST:
-                    view.tableMode = .THREAD
-                    cell = view.cellGetter?("basic")
-                    let custom = cell as? BasicCell
-                    let data = view.displayView![index] as! Board
-                    custom?.title.text = data.title
-                    custom?.onCellTouch = { i in
-                        let j = i as! Thread
-                        let nextVC = view.storyboard?.instantiateViewController(withIdentifier: "table") as? SuperTable
-                        nextVC?.isFirst = false
-                        nextVC?.displayView = j.res
-                        if(nextVC != nil){
-                            view.navigationController?.present(nextVC!, animated: true, completion: nil)
-                            //view.present(nextVC!, animated: true, completion: nil)
-                        }
-                    }
-                    break
-                case .CATEGORY_LIST:
-                    view.tableMode = .BOARD_LIST
-                    cell = view.cellGetter?("basic")
-                    let custom = cell as? BasicCell
-                    let data = view.displayView![index] as! Category
-                    custom?.title.text = data.title
-                    custom?.onCellTouch = { i in
-                        let j = i as! Board
-                        let nextVC = view.storyboard?.instantiateViewController(withIdentifier: "table") as? SuperTable
-                        nextVC?.isFirst = false
-                        nextVC?.displayView = j.nowThread
-                        if(nextVC != nil){
-                            view.navigationController?.present(nextVC!, animated: true, completion: nil)
-                            //view.present(nextVC!, animated: true, completion: nil)
-                        }
-                    }
-                    break
-                case .THREAD:
-                    view.tableMode = .RESPONSE
-                    cell = view.cellGetter?("threadcell")
-                    let custom = cell as? ThreadCell
-                    let data = view.displayView![index] as! Thread
-                    custom?.count.text = String(data.resCount)
-                    custom?.date.text = Parse().jpDateFormater.string(from: data.date)
-                    custom?.title.text = data.title
-                    custom?.ikioi.text = String(data.getIkioi())
-                    break
-                case .RESPONSE:
-                    cell = view.cellGetter?("rescell")
-                    let custom = cell as? ResponseCell
-                    let data = view.displayView![index] as! Res
-                    let datas = view.displayView!.map{Res(cast: $0)}
-                    
-                    custom?.create(all: datas, datas: datas, data: data, isCustomMode: false, nowView: view)
-                    
-                    break
-//                case .RESPONSE_TREE:
-//                    cell = view.cellGetter?("basic")
-//                    break
-                default:
-                    cell = view.cellGetter?("basic")
-                    cell?.textLabel?.text = "Error"
-            }
-            
-        }
-        return cell!
-    }
-    
+
 //    static func createServerTable(view:SuperTable,data:SaveTypeTag) -> UIViewController? {
 //        //サーバーのセルがタップされたとき
 //
@@ -209,6 +123,9 @@ class Manager {
         let nextVC = view.storyboard?.instantiateViewController(withIdentifier: "table") as? SuperTable
         nextVC?.isFirst = false
         nextVC?.displayView = category
+        nextVC?.storage = category
+        nextVC?.parentData = server
+        nextVC?.tableMode = .CATEGORY_LIST
         nextVC?.onCreateCell = { (i:Int,v:SuperTable) in
             let cell = v.cellGetter!("basiccell") as! BasicCell
             cell.setData(view: v, data: category[i])
@@ -220,24 +137,28 @@ class Manager {
     
     static func createBoardTable(view:SuperTable,data:SaveTypeTag) -> UIViewController? {
         
-        let server = data as! Category
-        let board = server.boards
+        let category = data as! Category
+        let board = category.boards
         
         let nextVC = view.storyboard?.instantiateViewController(withIdentifier: "table") as? SuperTable
         nextVC?.isFirst = false
         nextVC?.displayView = board
+        nextVC?.parentData = category
+        nextVC?.storage = board
+        nextVC?.tableMode = .BOARD_LIST
         nextVC?.onCreateCell = { (i:Int,v:SuperTable) in
             let cell = v.cellGetter!("basiccell") as! BasicCell
             cell.setData(view: v, data: board[i])
             return cell
         }
-        nextVC?.navigationItem.title = server.title
+        nextVC?.navigationItem.title = category.title
         return nextVC
     }
     
     static func createThreadTable(view:SuperTable,data:SaveTypeTag,isNow:Bool) -> UIViewController? {
         //サーバーのセルがタップされたとき
         let board = data as! Board
+        
         //var thread = isNow ? board.nowThread : board.cache
         
         if(board.cache.count > 0){
@@ -247,20 +168,25 @@ class Manager {
             //Realmに対して追加処理を忘れない〜
             let getthreads = Parse().getThreads(boardUrl: board.url).nowThread
             
-            board.cache = getthreads.count > 0 ? getthreads : Parse().getThreadsBy5ch(boardUrl: board.url).nowThread
+            board.cache = getthreads
             board.nowThread = board.cache
         }
         
         let nextVC = view.storyboard?.instantiateViewController(withIdentifier: "table") as? SuperTable
         nextVC?.isFirst = false
+        nextVC?.storage = board.nowThread
+        
+        //TODO: NG機能を検討する際は下の行を変更する
         nextVC?.displayView = board.nowThread
+        
+        nextVC?.tableMode = .THREAD
         
         //board.nowThread = Parse().getThreads(boardUrl: board.url).nowThread
         nextVC?.onCreateCell = { (i:Int,v:SuperTable) in
             //print("A")
             let cell = v.cellGetter!("threadcell")
             let threadcell = cell as! ThreadCell
-            threadcell.setData(view: v, data: nextVC!.displayView![i])
+            threadcell.setData(view: v, data: nextVC!.displayView[i])
             threadcell.title.numberOfLines = 0
             return cell!
         }
@@ -269,9 +195,23 @@ class Manager {
         nextVC?.onMenuTouch[3] = { view in
             DispatchQueue.global().async {
                 //nextVC?.displayView = []
+                //新着ラベルをつけるための処理
+                //一覧取得
                 let getthreads = Parse().getThreads(boardUrl: board.url).nowThread
+                //すでにテーブルにセット済みのデータ
+                let nowGetThreads:[Thread] = nextVC?.displayView as! [Thread]
+                //すでにテーブルにセット済みのスレッド配列からIDだけ抽出した配列
+                let nowGetThreadIDs = nowGetThreads.map{$0.id}
                 
-                nextVC?.displayView = getthreads.count > 0 ? getthreads : Parse().getThreadsBy5ch(boardUrl: board.url).nowThread
+                //その配列にダウンロードしたスレ一覧のIDが存在しなければ新着フラグを立てる
+                getthreads.filter{!nowGetThreadIDs.contains($0.id)}.forEach{$0.isSinchaku = true}
+                
+                //あとはセットする このとき中身が空だったらもう知らない　おそらくCP932関連のエンコードエラー
+                nextVC?.storage = getthreads
+                
+                //
+                nextVC?.displayView = nextVC?.storage.map{$0} ?? []
+                
                 DispatchQueue.main.async {
                     nextVC?.table?.reloadData()
                 }
@@ -285,7 +225,7 @@ class Manager {
         nextVC?.menuInfo[1] = "新着"
         nextVC?.onMenuTouch[1] = { view in
             DispatchQueue.global().async {
-                let array = nextVC?.displayView?.sorted(by: { (a, b) -> Bool in
+                let array = nextVC?.storage.sorted(by: { (a, b) -> Bool in
                     return (a as! Thread).date < (b as! Thread).date
                 }) ?? []
                 
@@ -302,7 +242,7 @@ class Manager {
         nextVC?.menuInfo[2] = "勢い"
         nextVC?.onMenuTouch[2] = { view in
             DispatchQueue.global().async {
-                let array = nextVC?.displayView?.sorted{
+                let array = nextVC?.storage.sorted{
                     Float(($0 as! Thread).getIkioi()) > ($1 as! Thread).getIkioi()
                     } ?? []
                 
@@ -328,7 +268,7 @@ class Manager {
     static func addCustomSearch(all:[Res], view:UIViewController,option:SearchFilter) {
         var result = option.search()
         var title = ""
-        let nextVC = view.storyboard?.instantiateViewController(withIdentifier: "custom") as? CustomSearchRes
+        let nextVC = view.storyboard?.instantiateViewController(withIdentifier: "custom") as? popupTable
         switch option.filter{
         case .NAME:
             title += "名前: "+option.searchWord
@@ -354,14 +294,19 @@ class Manager {
         case .NONE:
             title += "ERROR"
         }
-        nextVC?.displayTitle = title
+        nextVC?.displayTitle = title+" ["+String(result.count)+"件]"
         nextVC?.displayView = result
-        nextVC?.onCreateCell = { (i:Int,v:CustomSearchRes) in
+        nextVC?.onCreateCell = { (i:Int,v:popupTable) in
             let cell = v.cellGetter!("rescell")
             let threadcell = cell as! ResponseCell
-            threadcell.create(all: all, datas: result, data: result[i], isCustomMode: false, nowView: v)
+            threadcell.create(all: all, data: result[i], isCustomMode: false, nowView: v)
             return cell!
         }
+        
+        nextVC?.onCellLongTouch = {
+            popupLongCellTouch(view: nil, custom: nextVC!, data: nextVC!.displayView!, index: $0)
+        }
+        
         if(nextVC != nil){
             if(option.filter == .ID && result.count <= 1){
                 return
@@ -379,6 +324,10 @@ class Manager {
         //サーバーのセルがタップされたとき
         var thread = data as! Thread
         var nextVC = view.storyboard?.instantiateViewController(withIdentifier: "table") as? SuperTable
+
+        
+        
+        
         thread = Parse().getThread(thread: thread, onDownload: {
             DispatchQueue.main.async {
                 ToastView.showText(text: "ダウンロード開始")
@@ -401,64 +350,159 @@ class Manager {
                 view.present(alert, animated: true, completion: nil)
             }
         })
+        
         nextVC?.isFirst = false
         nextVC?.tableMode = .RESPONSE
-        nextVC?.displayView = thread.res
+        DispatchQueue.main.async {
+            ToastView.showText(text: "読み込み中...")
+        }
+        nextVC?.storage = thread.res
+        nextVC?.displayView = thread.res.map{$0}
+        nextVC?.parentData = thread
         nextVC?.onCreateCell = { (i:Int,v:SuperTable) in
             
             let cell = v.cellGetter!("rescell")
             let threadcell = cell as! ResponseCell
-            threadcell.create(all: thread.res,datas: nextVC?.displayView as! [Res], data: nextVC?.displayView?[i] as! Res, isCustomMode: false, nowView: v)
+            threadcell.create(all: nextVC?.storage as! [Res], data: nextVC?.storage[i] as! Res, isCustomMode: false, nowView: v)
+            
             return cell!
+        }
+        nextVC?.onCellLongTouch = {
+            popupLongCellTouch(view: view, custom: nil, data: nextVC!.displayView, index: $0)
         }
         
         nextVC?.menuInfo[3] = "更新"
         nextVC?.onMenuTouch[3] = { data in
+            
             DispatchQueue.global().async {
+                let thread = nextVC!.parentData as! Thread
                 
+                thread.res.forEach{$0.isSinchaku = false}
+                //差分データ
+                var updatedData = Parse().updateThread(thread: thread).res
                 
-                //nextVC?.displayView = Parse().update5chThread(thread: thread).res
-                var updatedData = Parse().update5chThread(thread: thread).res
+                var newTotalData = thread.res.map{$0}
+                updatedData.forEach{
+                    newTotalData.append($0)
+                }
+                
                 DispatchQueue.main.async {
-                    if(nextVC?.FistMenu.titleLabel?.text == "レス順"){
-                        updatedData = Parse().parseTreeArray(raw:updatedData)
-                    }
-                    ToastView.showText(text: "新着"+String(updatedData.count-(nextVC?.displayView?.count ?? 0))+"件")
-                    nextVC?.displayView = updatedData
+                    let isTree = nextVC?.FirstMenu.titleLabel?.text == "レス順"
+                    var newLabelIndexPath:IndexPath? = nil
                     
+                    if isTree{
+                        var parsedata = (Parse().parseTreeArrayPartOfUpdate(old: nextVC?.storage.map{Res(cast: $0)} ?? [], update: updatedData))
+
+                        var isfirstRes = true
+                        
+                        if(parsedata.count > 0){
+                            parsedata[0].isSinchaku = true
+                        }
+                        
+                        nextVC?.displayView = Parse().parseTreeArray(raw: thread.res)
+                        parsedata.forEach{nextVC?.displayView.append($0)}
+                        
+                        
+                        updatedData.forEach{
+                            nextVC?.storage.append($0)
+                            (nextVC?.parentData as! Thread).res.append($0)
+                        }
+                        nextVC?.storage = Parse.setRelationParentRes(raw: nextVC?.storage.map{Res(cast: $0)} ?? [])
+                    }else{
+                        var isfirstRes = true
+                        
+                        updatedData.forEach{
+                            
+                            if isfirstRes{
+                                isfirstRes = false
+                                let res = $0
+                                res.isSinchaku = true
+                                nextVC?.displayView.append(res)
+                            }else{
+                                nextVC?.displayView.append($0)
+                            }
+                            nextVC?.storage.append($0)
+                        }
+                        nextVC?.storage = Parse.setRelationParentRes(raw: nextVC?.storage.map{Res(cast: $0)} ?? [])
+                    }
+                    
+                    ToastView.showText(text: "新着 "+String(updatedData.count)+"件")
+                    //nextVC?.displayView = updatedData
+                    nextVC?.onCreateCell = { (i:Int,v:SuperTable) in
+                        var cell:UITableViewCell? = nil
+                        let data = nextVC?.displayView[i] as! Res
+                        if(data.isSinchaku){
+                            cell = v.cellGetter!("newres")
+                            
+                            let threadcell = cell as! NewResponseCell
+                            threadcell.create(all: newTotalData , data: data, isCustomMode: isTree, nowView: v)
+                            newLabelIndexPath = IndexPath(row: i, section: 0)
+                            return cell!
+                        }else{
+                            
+                            cell = v.cellGetter!("rescell")
+                            
+                            let threadcell = cell as! ResponseCell
+                            threadcell.create(all: newTotalData , data: data , isCustomMode: isTree, nowView: v)
+                            
+                            return cell!
+                        }
+                        
+                        
+                    }
+                    (nextVC?.parentData as! Thread).res = newTotalData
                     nextVC?.table?.reloadData()
+                    if(newLabelIndexPath != nil){
+                        nextVC?.table?.scrollToRow(at: newLabelIndexPath!, at: .top, animated: true)
+                    }
+                    
                 }
             }
         }
         
         nextVC?.menuInfo[1] = "ツリー"
         nextVC?.onMenuTouch[1] = { data in
-            if(nextVC?.FistMenu.titleLabel?.text == "ツリー"){
+            if(nextVC?.FirstMenu.titleLabel?.text == "ツリー"){
                 
-                nextVC?.FistMenu.setTitle("レス順", for: .normal)
+                nextVC?.FirstMenu.setTitle("レス順", for: .normal)
                 DispatchQueue.global().async {
-                    nextVC?.displayView = Parse().parseTreeArray(raw:nextVC?.displayView?.map{$0 as! Res} ?? [Res]() )
+                    let datas = nextVC?.storage.map{$0 as! Res} ?? []
+                    let parsed = Parse().parseTreeArray(raw: datas)
+                    nextVC?.displayView = parsed
                     nextVC?.onCreateCell = { (i:Int,v:SuperTable) in
-                        let cell = v.cellGetter!("rescell")
-                        let threadcell = cell as! ResponseCell
                         
-                        let datas = nextVC?.displayView as? [Res] ?? []
-                        threadcell.create(all: datas,datas: datas , data: datas[i], isCustomMode: true, nowView: v)
-                        return cell!
+                        var cell:UITableViewCell? = nil
+                        let data = nextVC?.displayView[i] as! Res
+                        if(data.isSinchaku){
+                            cell = v.cellGetter!("newres")
+                            
+                            let threadcell = cell as! NewResponseCell
+                            threadcell.create(all: datas , data: data, isCustomMode: true, nowView: v)
+                            
+                            return cell!
+                        }else{
+                            
+                            cell = v.cellGetter!("rescell")
+                            
+                            let threadcell = cell as! ResponseCell
+                            threadcell.create(all: datas , data: data , isCustomMode: true, nowView: v)
+                            
+                            return cell!
+                        }
                     }
                     DispatchQueue.main.async {
-                        nextVC?.onPutData!()
+                        nextVC?.table?.reloadData()
                     }
                 }
-            }else if(nextVC?.FistMenu.titleLabel?.text == "レス順"){
-                nextVC?.FistMenu.setTitle("ツリー", for: .normal)
+            }else if(nextVC?.FirstMenu.titleLabel?.text == "レス順"){
+                nextVC?.FirstMenu.setTitle("ツリー", for: .normal)
                 DispatchQueue.global().async {
                     nextVC?.displayView = thread.res
                     nextVC?.onCreateCell = { (i:Int,v:SuperTable) in
                         let cell = v.cellGetter!("rescell")
                         let threadcell = cell as! ResponseCell
                         let datas = nextVC?.displayView as? [Res] ?? []
-                        threadcell.create(all: datas,datas: datas , data: datas[i], isCustomMode: false, nowView: v)
+                        threadcell.create(all: datas, data: datas[i], isCustomMode: false, nowView: v)
                         return cell!
                     }
                     DispatchQueue.main.async {
@@ -468,25 +512,122 @@ class Manager {
             }
         }
         
-        nextVC?.menuInfo[4] = "一番上"
-        nextVC?.onMenuTouch[4] = { data in
-            nextVC?.table?.scrollToRow(at: IndexPath(row: 0, section: 0),
-                                       at: UITableView.ScrollPosition.top, animated: true)
-        }
-        
-        nextVC?.menuInfo[5] = "一番下"
+        nextVC?.menuInfo[5] = "移動"
         nextVC?.onMenuTouch[5] = { data in
-            nextVC?.table?.scrollToRow(at: IndexPath(row: (nextVC?.displayView?.count ?? 1) - 1, section: 0),
-                                       at: UITableView.ScrollPosition.bottom, animated: true)
+            
+            let alert: UIAlertController = UIAlertController(title: "次の場所に移動します", message: "", preferredStyle:  UIAlertController.Style.actionSheet)
+            // Defaultボタン
+            let first: UIAlertAction = UIAlertAction(title: "一番上", style: UIAlertAction.Style.default, handler:{
+                (action: UIAlertAction!) -> Void in
+                nextVC?.table?.scrollToRow(at: IndexPath(row: 0, section: 0),
+                                           at: UITableView.ScrollPosition.top, animated: true)
+            })
+            let end: UIAlertAction = UIAlertAction(title: "一番下", style: UIAlertAction.Style.default, handler:{
+                (action: UIAlertAction!) -> Void in
+                nextVC?.table?.scrollToRow(at: IndexPath(row: (nextVC?.displayView.count ?? 1) - 1, section: 0),
+                                           at: UITableView.ScrollPosition.bottom, animated: true)
+            })
+            
+            // Cancelボタン
+            let cancelAction: UIAlertAction = UIAlertAction(title: "キャンセル", style: UIAlertAction.Style.cancel, handler:{(action: UIAlertAction!) -> Void in})
+            
+            alert.addAction(first)
+            alert.addAction(end)
+            alert.addAction(cancelAction)
+            nextVC?.present(alert, animated: true, completion: nil)
+            
         }
         
         nextVC?.menuInfo[2] = "書込"
         nextVC?.onMenuTouch[2] = { data in
-            
+            popupPostMenu(view: view, data: [nextVC!.parentData!], index: nil, isInyou: false)
         }
+        
+        
         
         nextVC?.navigationItem.title = thread.title
         return nextVC
+    }
+    
+    static func popupResMenu(view:SuperTable?,custom:popupTable?,index:Int,datas:[SaveTypeTag]) {
+        let res = datas[index] as! Res
+        
+        let menu = UIAlertController(title: "", message: String(res.num)+" 名前: "+res.writterName+" "+String(Parse().jpDateFormater.string(from: res.date)+" ID:"+res.writterId), preferredStyle: UIAlertController.Style.actionSheet)
+        let copy = UIAlertAction(title: "コピー", style: UIAlertAction.Style.default, handler: {
+            (formaction: UIAlertAction!) in
+            print("copy")
+        })
+        let reply = UIAlertAction(title: ">>"+String(res.num)+"にレス", style: UIAlertAction.Style.default, handler: {
+            (formaction: UIAlertAction!) in
+            popupPostMenu(view: view!, data: datas, index: index,isInyou: false)
+        })
+        let quote = UIAlertAction(title: ">>"+String(res.num)+"を引用", style: UIAlertAction.Style.default, handler: {
+            (formaction: UIAlertAction!) in
+            popupPostMenu(view: view!, data: datas, index: index,isInyou: true)
+        })
+        
+        let setsiori = UIAlertAction(title: "しおりを挟む", style: UIAlertAction.Style.default, handler: {
+            (formaction: UIAlertAction!) in
+            print("siori")
+        })
+        
+        let ng = UIAlertAction(title: "NGする", style: UIAlertAction.Style.default, handler: {
+            (formaction: UIAlertAction!) in
+            print("ng")
+        })
+        
+        let hissi = UIAlertAction(title: "必死チェッカー", style: UIAlertAction.Style.default, handler: {
+            (formaction: UIAlertAction!) in
+            
+        })
+        
+        let cancel = UIAlertAction(title: "キャンセル", style: UIAlertAction.Style.cancel, handler: {
+            (formaction: UIAlertAction!) in
+            print("cancel")
+        })
+        
+        menu.addAction(copy)
+        menu.addAction(reply)
+        menu.addAction(quote)
+        menu.addAction(setsiori)
+        menu.addAction(ng)
+        menu.addAction(hissi)
+        menu.addAction(cancel)
+        
+        if(view != nil){
+            view?.present(menu, animated: true, completion: nil)
+        }else if(custom != nil){
+            custom?.present(menu, animated: true, completion: nil)
+        }
+    }
+    
+    static func popupLongCellTouch(view:SuperTable?,custom:popupTable?,data:[SaveTypeTag],index:Int){
+        Manager.popupResMenu(view: view, custom: custom, index: index, datas: data)
+    }
+    
+    static func popupPostMenu(view: UIViewController,data:[SaveTypeTag],index:Int?,isInyou:Bool){
+        let res = data as? [Res]
+        let board = data as? [Board]
+        let thread = data as? [Thread]
+        let popup = view.storyboard?.instantiateViewController(withIdentifier: "write") as! postTable
+        if(res != nil && index != nil){
+            popup.bodyMes += ">>"+String(res![index!].num)
+            popup.titleMes = ">>"+String(res![index!].num)+"への返信"
+            if(isInyou){
+                popup.bodyMes += "\n"
+                popup.bodyMes += res![index!].body
+            }
+            
+        }else if(board != nil){
+            
+        }else if(thread != nil && index == nil){
+            popup.titleMes = "書き込み"
+        }
+        
+        
+        DispatchQueue.main.async {
+            view.present(popup, animated: true, completion: nil)
+        }
     }
     
     func fistPageReqest(view:SuperTable) {
@@ -496,16 +637,24 @@ class Manager {
         
         DispatchQueue.global().async {
             let Fivechserver = Server()
+            Fivechserver.title = "5ch.net"
             let Filechboard = Parse().getCategoryAndBoard(url: "http://menu.5ch.net/bbsmenu.html")
             Fivechserver.bigcategory = Filechboard
-            view.displayView?.append(Fivechserver)
-            
+            view.displayView.append(Fivechserver)
+            view.storage.append(Fivechserver)
+            let open = Server()
+            open.title = "おーぷん"
+            let openboard = Parse().getCategoryAndBoard(url: "https://menu.open2ch.net/bbsmenu.html")
+            open.bigcategory = openboard
+            view.displayView.append(open)
+            view.storage.append(open)
             
             view.onCreateCell = {(index:Int,view:SuperTable) -> UITableViewCell in
                 let cell = view.cellGetter!("basiccell")
                 let customcell = cell as! BasicCell
-                customcell.title.text = view.displayView?[index].title ?? "Error"
-                customcell.onCellTouch = {data in
+                customcell.title.text = view.displayView[index].title 
+                customcell.onCellTouch = {
+                    let data = view.displayView[$0]
                     let nextVC = Manager.createCategoryTable(view: view, data: data)
                     if(nextVC != nil){
                         view.navigationController?.pushViewController(nextVC!, animated: true)
@@ -557,22 +706,19 @@ class Manager {
                                     failedmes.message = "掲示板の追加に成功しました"
                                     target.present(failedmes, animated: true, completion: nil)
                                     server.title = name
-                                    self.downloadedData.append(server)
-                                    DispatchQueue.main.sync {
-                                        
-                                        
-                                        target.displayView = self.downloadedData.map{$0}
-                                        
+                                    //self.downloadedData.append(server)
+                                    DispatchQueue.main.async {
+                                        target.displayView.append(server)
+                                        target.storage.append(server)
                                         target.onCreateCell = {(index:Int,view:SuperTable) -> UITableViewCell in
                                             let cell = view.cellGetter!("basiccell")
                                             let customcell = cell as! BasicCell
-                                            customcell.title.text = target.displayView?[index].title ?? "Error"
-                                            customcell.onCellTouch = {data in
-                                                let nextVC = Manager.createCategoryTable(view: target, data: data)
+                                            customcell.title.text = target.displayView[index].title
+                                            customcell.onCellTouch = {
                                                 
-                                                if(nextVC != nil){
-                                                    view.navigationController?.pushViewController(nextVC!, animated: true)
-                                                }
+                                                let data = view.displayView[$0]
+                                                let nextVC = Manager.createCategoryTable(view: target, data: data) as! SuperTable
+                                                view.navigationController?.pushViewController(nextVC, animated: true)
                                             }
                                             return cell!
                                         }
