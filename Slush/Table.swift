@@ -74,6 +74,7 @@ class ThreadCell: UITableViewCell,TapbleCell {
         self.onCellTouch = {data in
             DispatchQueue.global().async {
                 let nextVC = Manager.createResTable(view: view, data: thread)
+                (nextVC as? SuperTable)?.parentData = thread
                 if(nextVC != nil){
                     DispatchQueue.main.async {
                         view.navigationController?.pushViewController(nextVC!, animated: true)
@@ -134,8 +135,9 @@ class NewResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
             return #colorLiteral(red: 0.5568627715, green: 0.3529411852, blue: 0.9686274529, alpha: 1)
         }else if count == 1{
             return #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1)
+        }else{
+            return .white
         }
-        return #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1)
     }
     
     @objc func onTouchLabel(sender:UITapGestureRecognizer) {
@@ -369,6 +371,8 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
             return #colorLiteral(red: 0.5568627715, green: 0.3529411852, blue: 0.9686274529, alpha: 1)
         }else if count == 1{
             return #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1)
+        }else if count == 0{
+            return #colorLiteral(red: 1, green: 1, blue: 1, alpha: 1)
         }
         return #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1)
     }
@@ -511,14 +515,14 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
         if(isCustomMode){
             if(data.treeDepth == 0){
                 self.treeWall.backgroundColor = #colorLiteral(red: 0.168627451, green: 0.1675006281, blue: 0.168627451, alpha: 1)
-                self.treeSpace.constant = CGFloat(4)
+                self.treeSpace.constant = CGFloat(2)
             }else{
                 self.treeWall.backgroundColor = #colorLiteral(red: 0.9372549057, green: 0.9372549057, blue: 0.9568627477, alpha: 1)
-                self.treeSpace.constant = CGFloat((Float(8) * Float(data.treeDepth)))
+                self.treeSpace.constant = CGFloat((Float(4) * Float(data.treeDepth)))
             }
         }else{
             self.treeWall.backgroundColor = #colorLiteral(red: 0.168627451, green: 0.1675006281, blue: 0.168627451, alpha: 1)
-            self.treeSpace.constant = CGFloat(4)
+            self.treeSpace.constant = CGFloat(2)
         }
         self.body.delegate = self
     }
@@ -641,6 +645,11 @@ class postTable :UIViewController{
         }
     }
     
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        self.view.endEditing(true)
+    }
+    
+    
     
 }
 
@@ -678,12 +687,13 @@ class popupTable : UIViewController, UITableViewDelegate , UITableViewDataSource
 
     var displayTitle = ""
 
+    var parentData:SaveTypeTag? = nil
     
     @IBAction func onTouchOutOfRange(_ sender: Any) {
         self.outofrange.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0)
         dismiss(animated: true, completion: nil)
     }
-    
+
     override func viewDidLayoutSubviews() {
         self.view.layoutIfNeeded()
         if(table?.contentSize.height ?? 0 < table?.frame.size.width ?? 0){
@@ -697,17 +707,6 @@ class popupTable : UIViewController, UITableViewDelegate , UITableViewDataSource
             self.height?.constant = self.view.bounds.width
         }
     }
-    
-//    override func viewDidAppear(_ animated: Bool) {
-//        if(table?.contentSize.height ?? 0 < table?.frame.size.width ?? 0){
-////            print(table?.contentSize.height ?? 0)
-////            print(table?.frame.size.width)
-//            self.height.constant = self.table!.contentSize.height+21+10
-//
-//            //self.table?.isScrollEnabled = false
-//            //table?.isScrollEnabled = false
-//        }
-//    }
     
     override func viewDidLoad() {
         self.table?.delegate = self
@@ -786,6 +785,32 @@ class popupTable : UIViewController, UITableViewDelegate , UITableViewDataSource
     }
 }
 
+class ResponseEditView: UIViewController {
+    
+    @IBOutlet weak var titleBar: UILabel!
+    
+    @IBOutlet weak var body: UITextView!
+    
+    @IBOutlet weak var outofrange: UIButton!
+    
+    var titleMes:String? = ""
+    var bodyString:String? = ""
+    
+    override func viewDidLoad() {
+        titleBar.text = titleMes ?? ""
+        body.text = bodyString ?? ""
+    }
+    
+    @IBAction func onTouchOutOfRange(_ sender: Any) {
+        self.outofrange.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0)
+        dismiss(animated: true, completion: nil)
+    }
+    
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        self.view.endEditing(true)
+    }
+}
+
 //このクラスをコントローラーとして用いるべきではない あまりに汚い
 class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIGestureRecognizerDelegate{
     
@@ -803,16 +828,6 @@ class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIG
     @IBOutlet weak var ForthMenu: UIButton!
     
     @IBOutlet weak var FifthMenu: UIButton!
-    //ここまでが対象
-    
-    //最初の画面以外では非表示
-    @IBOutlet weak var sizeOfTopMenu: NSLayoutConstraint!
-    
-    @IBOutlet weak var boardListReq: UIButton!
-    
-    @IBOutlet weak var boaedFavReq: UIButton!
-    
-    @IBOutlet weak var boardHisReq: UIButton!
     //ここまでが対象
     
     //もしこのビューが一番最初にロードされるものだった（ルートビュー）ら有効にするフラグ
@@ -880,18 +895,14 @@ class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIG
         
         //レスモードのときは上のメニューバーを閉じる
         if(tableMode != nil){
-            self.boaedFavReq.isHidden = true
-            self.boardHisReq.isHidden = true
-            self.boardListReq.isHidden = true
             if(tableMode! == .THREAD){
                 self.progress.isHidden = false
             }else{
                 self.progress.isHidden = true
                 if(tableMode! == .RESPONSE){
-                    ToastView.showText(text: "新着"+String((displayView.count ))+"件")
+                    ToastView.showText(text: "未読"+String((displayView.count ))+"件")
                 }
             }
-            sizeOfTopMenu.constant = 0
         }
         
         FirstMenu.titleLabel?.adjustsFontSizeToFitWidth = true

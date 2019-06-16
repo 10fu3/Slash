@@ -15,6 +15,11 @@ enum SaveType: String {
     case BOARD = "BOARD"
     case THREAD = "THREAD"
     case RESPONSE = "RESPONSE"
+    case NG = "NG"
+}
+
+class TableFilter {
+    
 }
 
 protocol SaveTypeTag {

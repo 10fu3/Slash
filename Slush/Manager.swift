@@ -356,7 +356,7 @@ class Manager {
         DispatchQueue.main.async {
             ToastView.showText(text: "読み込み中...")
         }
-        nextVC?.storage = thread.res
+        nextVC?.storage = thread.res.map{$0}
         nextVC?.displayView = thread.res.map{$0}
         nextVC?.parentData = thread
         nextVC?.onCreateCell = { (i:Int,v:SuperTable) in
@@ -377,9 +377,15 @@ class Manager {
             DispatchQueue.global().async {
                 let thread = nextVC!.parentData as! Thread
                 
+                if(thread.res.count == 0){
+                    nextVC?.storage.map{$0 as! Res}.forEach{
+                        thread.res.append($0)
+                    }
+                }
+                
                 thread.res.forEach{$0.isSinchaku = false}
                 //差分データ
-                var updatedData = Parse().updateThread(thread: thread).res
+                let updatedData = Parse().updateThread(thread: thread).res
                 
                 var newTotalData = thread.res.map{$0}
                 updatedData.forEach{
@@ -388,17 +394,15 @@ class Manager {
                 
                 DispatchQueue.main.async {
                     let isTree = nextVC?.FirstMenu.titleLabel?.text == "レス順"
-                    var newLabelIndexPath:IndexPath? = nil
                     
                     if isTree{
                         var parsedata = (Parse().parseTreeArrayPartOfUpdate(old: nextVC?.storage.map{Res(cast: $0)} ?? [], update: updatedData))
-
-                        var isfirstRes = true
                         
                         if(parsedata.count > 0){
                             parsedata[0].isSinchaku = true
                         }
                         
+                        nextVC?.displayView.removeAll()
                         nextVC?.displayView = Parse().parseTreeArray(raw: thread.res)
                         parsedata.forEach{nextVC?.displayView.append($0)}
                         
@@ -410,6 +414,10 @@ class Manager {
                         nextVC?.storage = Parse.setRelationParentRes(raw: nextVC?.storage.map{Res(cast: $0)} ?? [])
                     }else{
                         var isfirstRes = true
+                        nextVC?.displayView.removeAll()
+                        thread.res.forEach{
+                            nextVC?.displayView.append($0)
+                        }
                         
                         updatedData.forEach{
                             
@@ -436,7 +444,6 @@ class Manager {
                             
                             let threadcell = cell as! NewResponseCell
                             threadcell.create(all: newTotalData , data: data, isCustomMode: isTree, nowView: v)
-                            newLabelIndexPath = IndexPath(row: i, section: 0)
                             return cell!
                         }else{
                             
@@ -452,12 +459,14 @@ class Manager {
                     }
                     (nextVC?.parentData as! Thread).res = newTotalData
                     nextVC?.table?.reloadData()
-                    if(newLabelIndexPath != nil){
-                        nextVC?.table?.scrollToRow(at: newLabelIndexPath!, at: .top, animated: true)
-                    }
+                    
                     
                 }
             }
+        }
+        
+        nextVC?.onMenuLongTouch[3] = { table in
+            ToastView.showText(text: "オートリロードON")
         }
         
         nextVC?.menuInfo[1] = "ツリー"
@@ -555,7 +564,11 @@ class Manager {
         let menu = UIAlertController(title: "", message: String(res.num)+" 名前: "+res.writterName+" "+String(Parse().jpDateFormater.string(from: res.date)+" ID:"+res.writterId), preferredStyle: UIAlertController.Style.actionSheet)
         let copy = UIAlertAction(title: "コピー", style: UIAlertAction.Style.default, handler: {
             (formaction: UIAlertAction!) in
-            print("copy")
+            
+            let beforeView = view != nil ? view : custom
+            if(beforeView != nil){
+                popupCopyView(view: beforeView!, res: res)
+            }
         })
         let reply = UIAlertAction(title: ">>"+String(res.num)+"にレス", style: UIAlertAction.Style.default, handler: {
             (formaction: UIAlertAction!) in
@@ -578,7 +591,8 @@ class Manager {
         
         let hissi = UIAlertAction(title: "必死チェッカー", style: UIAlertAction.Style.default, handler: {
             (formaction: UIAlertAction!) in
-            
+            print((view?.parent as? Thread)?.url)
+            print((custom?.parent as? Thread)?.url)
         })
         
         let cancel = UIAlertAction(title: "キャンセル", style: UIAlertAction.Style.cancel, handler: {
@@ -603,6 +617,19 @@ class Manager {
     
     static func popupLongCellTouch(view:SuperTable?,custom:popupTable?,data:[SaveTypeTag],index:Int){
         Manager.popupResMenu(view: view, custom: custom, index: index, datas: data)
+    }
+    
+    static func popupCopyView(view:UIViewController,res:Res) {
+        let popup = view.storyboard?.instantiateViewController(withIdentifier: "editres") as! ResponseEditView
+        let bodyData = String(res.num)+" "+res.writterName+" "+String(Parse().jpDateFormater.string(from: res.date)+" ID:"+res.writterId)+"\n"+res.body
+        
+        popup.titleMes = ">>"+String(res.num)+"のコピー"
+        popup.bodyString = bodyData
+        
+        DispatchQueue.main.async {
+            view.present(popup, animated: true, completion: nil)
+        }
+        
     }
     
     static func popupPostMenu(view: UIViewController,data:[SaveTypeTag],index:Int?,isInyou:Bool){
@@ -751,8 +778,6 @@ class Manager {
             editform.addAction(editcancel)
             target.present(editform, animated: true, completion: nil)
         }
-        
-        view.boardListReq.tintColor = .yellow
     }
     
 }

@@ -8,7 +8,6 @@
 
 import Foundation
 import UIKit
-import Ji
 
 extension String {
     
@@ -41,9 +40,10 @@ class Pattern {
     static let resCountRegex:NSRegularExpression = try! NSRegularExpression(pattern: "\\(.+?\\)", options: .caseInsensitive)
     
     static let categoryTitle = try! NSRegularExpression(pattern: "(?i)<BR><BR><B>(.+?)</B><BR>", options: [])
+    static let categoryTitle1 = try! NSRegularExpression(pattern: "(?i)<BR><B>(.+?)</B><BR>", options: [])
     
-    static let boardurl = try! NSRegularExpression(pattern: "<A HREF=(.+?)>", options: [])
-    static let boardname = try! NSRegularExpression(pattern: "/>(.+?)</A>", options: [])
+    static let boardurl = try! NSRegularExpression(pattern: "(?i)<A HREF=\"?(.+?)\"?>", options: [])
+    static let boardname = try! NSRegularExpression(pattern: "(?i)/\"?>(.+?)</A>", options: [])
 
     
     static let httpregex = try! NSRegularExpression(pattern: "https?://([\\w-]+\\.)+[\\w-]+(/[\\w-./?%&=]*)?$", options: .caseInsensitive)
@@ -271,6 +271,10 @@ class Parse {
                     continue
                 }
                 pick.treeDepth = deepLev
+                if(pick.treeParent.count >= 2){
+                    display.append(pick)
+                    continue
+                }
                 if(pick.treeChildren.count > 0){
                     display.append(pick)
                     f!(pick,deepLev+1)
@@ -282,6 +286,10 @@ class Parse {
         
         for i in update{
             var isSearchedOld = false
+            if(i.toRef.count >= 2){
+                display.append(i)
+                continue
+            }
             for j in i.toRef{
                 for k in j.1{
                     let index = forScan(old,k+1)
@@ -299,6 +307,12 @@ class Parse {
             }
             
         }
+        
+        display.forEach{$0.isSinchaku = false}
+        if display.count > 0{
+            display[0].isSinchaku = true
+        }
+        
         return display
     }
     
@@ -331,6 +345,10 @@ class Parse {
                 
                 
                 pick.treeDepth = deepLev
+                if(pick.treeParent.count >= 2){
+                    values.append(pick)
+                    continue
+                }
                 if(pick.treeChildren.count > 0){
                     values.append(pick)
                     f!(pick,deepLev+1)
@@ -377,7 +395,7 @@ class Parse {
     }
     
     func updateDatThread(thread:Thread) -> Thread {
-        let downloaded = getThreadByDat(url: thread.url,isUpdate: thread)
+        let downloaded = getThreadByDat(url: thread.url.contains("jbbs") ? thread.url.replacingOccurrences(of: "read.cgi", with: "rawmode.cgi"):thread.url,isUpdate: thread)
         let data = Thread(cast: thread)
         if(downloaded.res.count - thread.res.count) > 0{
             data.res = downloaded.res[thread.res.count..<downloaded.res.count].map{$0}
@@ -404,17 +422,28 @@ class Parse {
         
         let data = HttpClientImpl().getDatafromHTTP(url: titles)
         
-        var shitJIS:String = String(data: data, encoding: .shiftJIS) ?? ""
+        var stringdata:String = String(data: data, encoding: .japaneseEUC) ?? ""
         
-        if(shitJIS.count == 0){
-            shitJIS = HttpClientImpl().getStringDataWithCP932(data: data as NSData)
+        if(stringdata.count == 0){
+            stringdata = HttpClientImpl().getStringDataWithCP932(data: data as NSData)
         }
         
-        let lines:[String] = shitJIS.components(separatedBy: "\n")
+        let lines:[String] = stringdata.components(separatedBy: "\n")
         
         
         for line in lines{
-            let datAndTitle = line.components(separatedBy: "<>")
+            var datAndTitle = line.components(separatedBy: "<>")
+            if(datAndTitle.count == 1){
+                datAndTitle = line.components(separatedBy: ",")
+            }
+            if(datAndTitle.count > 2){
+                datAndTitle = [datAndTitle[0]]
+                var temp = ""
+                for i in 1..<datAndTitle.count{
+                    temp += datAndTitle[i]
+                }
+                datAndTitle[1] = temp
+            }
             if(datAndTitle.count == 2){
                 let thread = Thread()
                 thread.id = String(datAndTitle[0].prefix(datAndTitle[0].count-4))
@@ -424,7 +453,6 @@ class Parse {
                 thread.title = String(htmlEncodedString: rawtitle.trimmingCharacters(in: NSCharacterSet.whitespaces))
                 thread.url = cgiurl+thread.id
                 board.nowThread.append(thread)
-                
             }
         }
         
@@ -436,7 +464,7 @@ class Parse {
     func getCategoryAndBoard(url:String) -> [Category] {
         var categories = [Category]()
         
-        let data = HttpClientImpl().getDatafromHTTP(url: url)
+        let data = HttpClientImpl().getDatafromHTTP(url: url.replacingOccurrences(of: "\\", with:""))
         
         var str:String = String(data: data, encoding: .shiftJIS) ?? ""
         
@@ -473,19 +501,45 @@ class Parse {
                 }
             }
         }
+        
+        if(categories.count == 0){
+            for line in str.components(separatedBy: "\n"){
+                let rawtitle = Pattern.pattern(pattern: Pattern.categoryTitle1, target: line)
+                let category = Category()
+                if(rawtitle.count > 0){
+                    let title = rawtitle[0]
+                    category.title = title
+                    categories.append(category)
+                }else if categories.count > 0{
+                    let lastAppendCategory = categories[categories.count-1]
+                    let board = Board()
+                    let rawurl = Pattern.pattern(pattern: Pattern.boardurl, target: line)
+                    let rawname = Pattern.pattern(pattern: Pattern.boardname, target: line)
+                    if(rawurl.count > 0){
+                        let url = rawurl[0]
+                        board.url = url
+                    }
+                    if(rawname.count > 0){
+                        let name = rawname[0]
+                        board.title = name
+                    }
+                    if(board.title.count > 0 && board.url.count > 0){
+                        lastAppendCategory.boards.append(board)
+                    }
+                }
+            }
+        }
         return categories
     }
     
     func get5chThreadByUrl(url:String,onDownload:(()->Void)?,onParse:((Int,Int)->Void)?,onError:(()->Void)?) -> Thread {
-        //var isFirstRes = false
-        var updatedata = [Res]()
         
         let thread = Thread()
         
         let urlGroup = url.components(separatedBy: "/")
         
         onDownload?()
-        let data = HttpClientImpl().getDatafromHTTP(url: url)
+        let data = HttpClientImpl().getDatafromHTTP(url: url.replacingOccurrences(of: "\\", with:""))
         
         var str:String = String(data: data, encoding: .shiftJIS) ?? ""
         
@@ -546,6 +600,7 @@ class Parse {
         let threadborn = TimeInterval.init(urlGroup[urlGroup.count-1].replacingOccurrences(of: ".dat", with: "")) ?? 0
         thread.date = Date(timeIntervalSince1970: threadborn)
         thread.res = Parse.setRelationParentRes(raw: thread.res)
+        thread.url = url
         
         return thread
     }
@@ -570,6 +625,8 @@ class Parse {
     func getThread(url:String,onDownload:(()->Void)?,onParse:((Int,Int)->Void)?,onError:(()->Void)?) -> Thread {
         if(url.contains("5ch.net")){
             return get5chThreadByUrl(url: url,onDownload: onDownload,onParse: onParse,onError: onError)
+        }else if(url.contains("jbbs")){
+            return getThreadByDat(url: url.replacingOccurrences(of: "read.cgi", with:"rawmode.cgi"),isUpdate: nil)
         }
         return getThreadByDat(url: url,isUpdate: nil)
     }
@@ -579,9 +636,13 @@ class Parse {
         
         var isFirstRes = false
         
-        let urlGroup = url.replacingOccurrences(of: "test/read.cgi/", with: "").components(separatedBy: "/")
-        let threadnumber = urlGroup[urlGroup.count-1]
-        let datUrl = urlGroup[0]+"//"+urlGroup[2]+"/"+urlGroup[urlGroup.count-2]+"/dat/"+urlGroup[urlGroup.count-1]+".dat"
+        var urlGroup = url.replacingOccurrences(of: "test/read.cgi/", with: "").components(separatedBy: "/")
+        var datUrl = ""
+        if(url.contains("jbbs")){
+            datUrl = urlGroup[0]+"//"+urlGroup[2]+"/bbs/"+"rawmode.cgi/"+urlGroup[3]+"/"+urlGroup[urlGroup.count-2]+"/"+urlGroup[urlGroup.count-1]+".dat"
+        }else{
+            datUrl = urlGroup[0]+"//"+urlGroup[2]+"/"+urlGroup[urlGroup.count-2]+"/dat/"+urlGroup[urlGroup.count-1]+".dat"
+        }
         var responses = [Res]()
         
         let parseUrl = datUrl
@@ -589,7 +650,7 @@ class Parse {
             //parseUrl += ".dat"
         }
         
-        let raw:[String] = HttpClientImpl().getStringData(url: parseUrl , encode: String.Encoding.shiftJIS)
+        let raw:[String] = HttpClientImpl().getStringData(url: parseUrl, encode: String.Encoding.shiftJIS)
         var count = 0
         for line in raw{
             if(line.count <= 0){
