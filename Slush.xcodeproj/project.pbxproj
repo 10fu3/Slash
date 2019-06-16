@@ -8,8 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		9B16C85422A2D70E008EFF96 /* ToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B16C85322A2D70E008EFF96 /* ToastView.swift */; };
-		9B988943229C0720009B56FE /* Ji.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9BCB0EBC229AC773004D9AE1 /* Ji.framework */; };
-		9B988944229C0720009B56FE /* Ji.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9BCB0EBC229AC773004D9AE1 /* Ji.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		9B988945229C0720009B56FE /* Realm.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9BCB0EBD229AC775004D9AE1 /* Realm.framework */; };
 		9B988946229C0720009B56FE /* Realm.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9BCB0EBD229AC775004D9AE1 /* Realm.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		9B988947229C0720009B56FE /* RealmSwift.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9BCB0EBE229AC775004D9AE1 /* RealmSwift.framework */; };
@@ -44,7 +42,6 @@
 			dstSubfolderSpec = 10;
 			files = (
 				9B988946229C0720009B56FE /* Realm.framework in Embed Frameworks */,
-				9B988944229C0720009B56FE /* Ji.framework in Embed Frameworks */,
 				9B988948229C0720009B56FE /* RealmSwift.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
@@ -79,7 +76,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				9B988945229C0720009B56FE /* Realm.framework in Frameworks */,
-				9B988943229C0720009B56FE /* Ji.framework in Frameworks */,
 				9B988947229C0720009B56FE /* RealmSwift.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
