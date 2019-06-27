@@ -57,6 +57,8 @@ class Pattern {
     static let datepattern = try! NSRegularExpression(pattern: "<span class=\"date\">(.+?)</span>", options: [])
     static let bodypattern = try! NSRegularExpression(pattern: "<div class=\"message\"><span class=\"escaped\">(.+?)</span>", options: [])
     static let mailpattern = try! NSRegularExpression(pattern: "<a href=\"mailto:(.+?)\">", options: [])
+    static let idbodypattern = try! NSRegularExpression(pattern: "ID:(.+?) ", options: [])
+    
     
     func detectEncoding(data: NSData) -> String.Encoding {
         return String.Encoding(rawValue: NSString.stringEncoding(
@@ -89,6 +91,17 @@ class Pattern {
         return results
     }
     
+    func getIDInBody(data:String) -> [String] {
+        let matches = Pattern.idbodypattern.matches(in: data, options: [], range: NSMakeRange(0, data.count))
+        
+        var results: [String] = []
+        matches.forEach { (match) -> () in
+            results.append( (data as NSString).substring(with: match.range(at: 1)) )
+        }
+        return results
+    }
+    
+    
     func getPictureLink(data:String) -> [String] {
         let matches = Pattern.pictureRegex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
         
@@ -110,21 +123,14 @@ class Pattern {
     }
     
     func getUrlLink(data:String) -> [String] {
-        let matches = Pattern.httpregex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
-        
-        var results: [String] = []
-        matches.forEach { (match) -> () in
-            results.append( (data as NSString).substring(with: match.range(at: 0)) )
+        let text = data
+        let types: NSTextCheckingResult.CheckingType = .link
+        var URLStrings = [URL]()
+        let detector = try? NSDataDetector(types: types.rawValue)
+        detector?.enumerateMatches(in: text, options: [], range: NSMakeRange(0, (text as NSString).length)) { (result, flags, _) in
+            URLStrings.append(result!.url!)
         }
-        
-        let matches1 = Pattern.ttpregex.matches(in: data, options: [], range: NSMakeRange(0, data.count))
-
-        matches1.forEach { (match) -> () in
-            results.append( (data as NSString).substring(with: match.range(at: 0)) )
-        }
-        
-        
-        return results
+        return URLStrings.map{$0.absoluteString}
     }
     
     //値がおかしいときは0を返す
@@ -163,9 +169,9 @@ class Pattern {
                         }else if(count ?? 0 >= 1 && count1 ?? 0 >= 1){
                             var range = ((Array<Int>)(0...1))
                             if(count! < count1!){
-                                range = ((Array<Int>)((count!-1)...(count1!-1)))
+                                range = ((Array<Int>)((count!)...(count1!)))
                             }else{
-                                range = ((Array<Int>)((count1!-1)...(count!-1)))
+                                range = ((Array<Int>)((count1!)...(count!)))
                             }
                             range.removeAll(where: {$0 == 0})
                             
@@ -174,7 +180,7 @@ class Pattern {
                     }else{
                         let count = (Int.init(sepalatebar[0]) ?? 0)
                         if(count >= 1){
-                            put.1.append(count-1)
+                            put.1.append(count)
                         }
                     }
                     
@@ -195,7 +201,8 @@ class Parse {
     
     init() {
         jpDateFormater.locale = Locale(identifier: "ja_JP")
-        jpDateFormater.dateFormat = "yyyy/MM/dd(EEE)HH:mm:ss"
+        jpDateFormater.dateFormat = "yyyy/MM/dd(EEE) HH:mm:ss"
+        //jpDateFormater.dateFormat = "2019/06/20(木) 17:52:45.61"
         
     }
     static func setRelationParentRes(raw:[Res]) -> [Res] {
@@ -204,17 +211,11 @@ class Parse {
         for res in refres{
             for refs in res.toRef{
                 for ref in refs.1{
-                    var refd:Res
-                    if(ref > raw.count){
-                        let temp = raw.filter{$0.num == ref}.first
-                        if(temp != nil){
-                            refd = temp!
-                        }else{
-                            continue
-                        }
-                    }else{
-                        refd = raw[ref]
+                    let refTemp:Res? = raw.filter{$0.num == ref}.first
+                    guard let refd = refTemp else {
+                        continue
                     }
+                    
                     if(res.num == refd.num){
                         continue
                     }
@@ -238,7 +239,7 @@ class Parse {
         var display = [Res]()
         let updateNum = update.map{$0.num}
         var oldNum = old.map{$0.num}
-        print(updateNum)
+        //print(updateNum)
         var totaldatas = [Res]()
         old.forEach{totaldatas.append($0)}
         update.forEach{totaldatas.append($0)}
@@ -259,6 +260,9 @@ class Parse {
         
         f = {(res:Res,deepLev:Int) -> () in
             //var cache = Res()
+            if(deepLev > 100){
+                return
+            }
             for i in res.treeChildren{
                 if(i == res.num){
                     continue
@@ -292,7 +296,7 @@ class Parse {
             }
             for j in i.toRef{
                 for k in j.1{
-                    let index = forScan(old,k+1)
+                    let index = forScan(old,k)
                     if(index != nil && oldNum.contains(old[index!].num)){
                         oldNum.removeAll(where: {$0 == old[index!].num})
                         display.append(Res(cast: old[index!] as SaveTypeTag))
@@ -308,11 +312,7 @@ class Parse {
             
         }
         
-        display.forEach{$0.isSinchaku = false}
-        if display.count > 0{
-            display[0].isSinchaku = true
-        }
-        
+        //display.forEach{$0.isSinchaku = false}
         return display
     }
     
@@ -331,8 +331,12 @@ class Parse {
         var f: ((Res,Int) -> Void)? = nil
         f = {(res:Res,deepLev:Int) -> () in
 
+            if(deepLev > 100){
+                return
+            }
             //var cache = Res()
             for i in res.treeChildren{
+                
                 if(i == res.num){
                     continue
                 }
@@ -359,10 +363,17 @@ class Parse {
         }
         
         for res in raw{
-            if(res.treeParent.count == 0){
+            if(res.num == 1){
                 values.append(res)
                 if(res.treeChildren.count > 0){
                     f!(res,1)
+                }
+            }else{
+                if(res.treeParent.count == 0){
+                    values.append(res)
+                    if(res.treeChildren.count > 0){
+                        f!(res,1)
+                    }
                 }
             }
         }
@@ -382,9 +393,9 @@ class Parse {
     }
 
     
-    func replaceChar(rawdata:String) -> String {
-        return String(htmlEncodedString: rawdata)
-    }
+//    func replaceChar(rawdata:String) -> String {
+//        return String(htmlEncodedString: rawdata)
+//    }
     
     func updateThread(thread:Thread) -> Thread {
         if(thread.url.contains("5ch.net")){
@@ -586,19 +597,18 @@ class Parse {
                     res.writterName = nameArray[i]
                 }
                 
-                res.date = jpDateFormater.date(from: dateArray[i]) ?? Date()
-                let body = String(htmlEncodedString: bodyArray[i])
-                res.body = body
+                res.date = dateArray[i]
+                let body = bodyArray[i]
+                res.body = String(htmlEncodedString: body)
                 res.toRef = Pattern().getAnchor(data: res.body)
-//                if(isFirstRes == false){
-//                    res.isSinchaku = true
-//                    isFirstRes = true
-//                }
+                res.urls = Pattern().getUrlLink(data: res.body)
+
                 thread.res.append(res)
             }
         }
         let threadborn = TimeInterval.init(urlGroup[urlGroup.count-1].replacingOccurrences(of: ".dat", with: "")) ?? 0
         thread.date = Date(timeIntervalSince1970: threadborn)
+        thread.id = urlGroup[urlGroup.count-1].replacingOccurrences(of: ".dat", with: "")
         thread.res = Parse.setRelationParentRes(raw: thread.res)
         thread.url = url
         
@@ -667,30 +677,31 @@ class Parse {
                 var dateAndTime = dateAndId[0].components(separatedBy: " ")
                 if(dateAndTime.count > 1){
                     if(dateAndTime[0].count == "0000/00/00(火)".count){
-                        resvar.date = jpDateFormater.date(from: dateAndTime[0]+dateAndTime[1]) ?? Date()
+                        resvar.date = dateAndTime[0]+dateAndTime[1]
                     }else{
-                        resvar.date = jpDateFormater.date(from: "20"+dateAndTime[0]+dateAndTime[1]) ?? Date()
+                        resvar.date = "20"+dateAndTime[0]+dateAndTime[1]
                     }
                 }else{
                     if(dateAndTime[0].count == "0000/00/00(火)00:00:00".count){
-                        resvar.date = jpDateFormater.date(from: dateAndTime[0]) ?? Date()
+                        resvar.date = dateAndTime[0]
                     }else{
                         //応急措置 2100年以降は考えられてない
-                        resvar.date = jpDateFormater.date(from: "20"+dateAndTime[0]) ?? Date()
+                        resvar.date = "20"+dateAndTime[0]
                     }
                 }
                 
                 resvar.writterId = dateAndId[1]
             }
             resvar.num = count
-            resvar.body = replaceChar(rawdata: res[3])
-            resvar.toRef = Pattern().getAnchor(data: resvar.body)
             resvar.writterName = res[0].replacingOccurrences(of: "</b>", with: "")
             
-            if(isFirstRes == false){
-                resvar.isSinchaku = true
-                isFirstRes = true
-            }
+            resvar.body = String(htmlEncodedString: res[3])
+            resvar.toRef = Pattern().getAnchor(data: resvar.body)
+            resvar.urls = Pattern().getUrlLink(data: resvar.body)
+//            if(isFirstRes == false){
+//                resvar.isSinchaku = true
+//                isFirstRes = true
+//            }
             responses.append(resvar)
             
         }

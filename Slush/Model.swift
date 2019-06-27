@@ -137,10 +137,9 @@ class Thread:SaveTypeTag {
         self.savetype = .THREAD
         self.url = savedata.url
         self.lastRead = savedata.num
-        self.date = savedata.date
+        self.date = Parse().jpDateFormater.date(from: savedata.date) ?? Date()
         self.isfav = savedata.fav
         self.id = savedata.value
-        
         
         let predicate = NSPredicate(format: "dataType == %@","RESPONSE")
         let objs = Manager.manager.realm.objects(SaveObject.self).filter(predicate)
@@ -148,6 +147,7 @@ class Thread:SaveTypeTag {
             let res = Res(savedata: $0)
             self.res.append(res)
         }
+        self.res = Parse.setRelationParentRes(raw: self.res)
     }
     
     
@@ -170,7 +170,7 @@ class Thread:SaveTypeTag {
         savedata.dataType = self.savetype.rawValue
         savedata.url = self.url
         savedata.num = self.lastRead
-        savedata.date = self.date
+        savedata.date = Parse().jpDateFormater.string(from: self.date)
         savedata.fav = self.isfav
         savedata.value = self.id
         return savedata
@@ -206,7 +206,7 @@ class Res:SaveTypeTag {
         self.num = copy.num
         self.writterId = copy.writterId
         self.writterName = copy.writterName
-        self.date = Date(timeIntervalSince1970: copy.date.timeIntervalSince1970)
+        self.date = copy.date
         self.isfav = copy.isfav
         self.toRef = copy.toRef.map{
             var put:(String,[Int]) = ("",[])
@@ -224,6 +224,14 @@ class Res:SaveTypeTag {
             if(copy.num != c){
                 self.treeParent.append(c)
             }
+        }
+        
+        for c in copy.idInBody{
+            self.idInBody.append(c)
+        }
+        
+        for c in copy.urls{
+            self.urls.append(c)
         }
         
         self.treeParent = copy.treeParent
@@ -250,14 +258,16 @@ class Res:SaveTypeTag {
     var num = 0
     var writterId = ""
     var writterName = ""
-    var date = Date()
+    var date = ""
     var isfav = false
     //安価文字列,実際のインデックス(num-1)
     var toRef = [(String,[Int])]()
+    var idInBody = [String]()
     var treeChildren = [Int]()
     var treeParent = [Int]()
     var treeDepth = 0
     var pictureURL = [String]()
+    var urls = [String]()
     var movieURL = [String]()
     var address = ""
     var isAA = false
@@ -273,7 +283,7 @@ class SaveObject: Object {//保存する際に共通化するオブジェクト
     @objc var fav = false
     @objc var writterId = ""
     @objc var dataType = "SERVER"
-    @objc var date = Date()
+    @objc var date = ""
     
     @objc var num = 0//レス番
     @objc var url = ""//URL

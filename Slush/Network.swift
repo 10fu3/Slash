@@ -9,7 +9,7 @@
 import Foundation
 import UIKit
 
-public class HttpClientImpl {
+public class HttpClientImpl{
     
     private let session: URLSession
     
@@ -34,7 +34,7 @@ public class HttpClientImpl {
         return (d, r, e)
     }
     
-    public func convertImage(url:String) -> (data:Data,image:UIImage) {
+    public func convertImage(url:String) -> (data:Data,image:UIImage?) {
         let data = getDatafromHTTP(url: url)
         return (data,UIImage(data: data) ?? UIImage())
     }
@@ -107,7 +107,17 @@ public class HttpClientImpl {
     public func getDatafromHTTP(url:String) -> Data {
         let url = URL(string: url)!
         let req = NSMutableURLRequest(url: url)
+        req.httpMethod = "HEAD"
+        let (head, res, _) = execute(request: (req as URLRequest))
+        
+        //50MB超えで空データ 画像爆弾が効かないように
+        if(((res as? HTTPURLResponse)?.expectedContentLength ?? 0) > 51200000){
+            return Data()
+        }
+        
+        req.httpMethod = "GET"
         let (rawdata, _, _) = execute(request: (req as URLRequest))
+        
         if rawdata != nil{
             return Data.init(referencing: rawdata ?? NSData())
         }
@@ -115,13 +125,15 @@ public class HttpClientImpl {
     }
     
     func getDataByUrl(url: String) -> Data{
-        let url = URL(string: url)
-        do {
-            let data = try Data(contentsOf: url!)
-            return data
-        } catch let err {
-            print("Error : \(err.localizedDescription)")
-        }
-        return Data()
+        return getDatafromHTTP(url: url)
+//        let url = URL(string: url)
+//        do {
+//
+//            let data = try Data(contentsOf: url!)
+//            return data
+//        } catch let err {
+//            print("Error : \(err.localizedDescription)")
+//        }
+//        return Data()
     }
 }

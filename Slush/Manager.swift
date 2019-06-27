@@ -28,11 +28,9 @@ class SearchFilter {
             case .ANCHOR:
                 var values = [Res]()
                 for i in 0..<searchNum.count{
-                    for res in rawRes{
-                        if(res.num == searchNum[i]+1){
-                            if(!values.contains{$0.num == res.num}){
-                                values.append(res)
-                            }
+                    for res in (rawRes.filter{$0.num == searchNum[i]}){
+                        if(!values.contains{$0.num == res.num}){
+                            values.append(res)
                         }
                     }
                 }
@@ -93,10 +91,16 @@ class SearchFilter {
 class Manager {
     static let manager = Manager()
     
-    let realm = try! Realm()
+    let realm:Realm
     var downloadedData = [Server]()
     
     var views = [SuperTable]()
+    
+    init() {
+        var config = Realm.Configuration()
+        config.deleteRealmIfMigrationNeeded = true
+        realm = try! Realm(configuration: config)
+    }
 
 //    static func createServerTable(view:SuperTable,data:SaveTypeTag) -> UIViewController? {
 //        //サーバーのセルがタップされたとき
@@ -226,7 +230,8 @@ class Manager {
         nextVC?.onMenuTouch[1] = { view in
             DispatchQueue.global().async {
                 let array = nextVC?.storage.sorted(by: { (a, b) -> Bool in
-                    return (a as! Thread).date < (b as! Thread).date
+                    
+                    return (a as! Thread).date > (b as! Thread).date
                 }) ?? []
                 
                 
@@ -303,8 +308,11 @@ class Manager {
             return cell!
         }
         
-        nextVC?.onCellLongTouch = {
-            popupLongCellTouch(view: nil, custom: nextVC!, data: nextVC!.displayView!, index: $0)
+        nextVC?.onCellLongTouch = { (cellPoint:CGPoint,touch:CGPoint) in
+            let indexPath = nextVC?.table?.indexPathForRow(at: cellPoint)
+            if(indexPath != nil){
+                popupLongCellTouch(view: nil, custom: nextVC!, data: nextVC?.displayView ?? [], index: indexPath!.row, point: touch)
+            }
         }
         
         if(nextVC != nil){
@@ -335,11 +343,11 @@ class Manager {
         }, onParse: { part,all in
             DispatchQueue.main.async {
                 view.progress?.progress = Float(part)/Float(all)
-                print(Float(part)/Float(all))
+                //print(Float(part)/Float(all))
             }
         }, onError: {
             DispatchQueue.main.async {
-                let alert: UIAlertController = UIAlertController(title: "読み込みエラー", message: "対象のデータにCP932のコードが含まれているか、オフラインの可能性があります", preferredStyle:  UIAlertController.Style.alert)
+                let alert: UIAlertController = UIAlertController(title: "読み込みエラー", message: "オフラインの可能性があります", preferredStyle:  UIAlertController.Style.alert)
                 
                 let defaultAction: UIAlertAction = UIAlertAction(title: "OK", style: UIAlertAction.Style.default, handler:{
                     // ボタンが押された時の処理を書く（クロージャ実装）
@@ -367,8 +375,11 @@ class Manager {
             
             return cell!
         }
-        nextVC?.onCellLongTouch = {
-            popupLongCellTouch(view: view, custom: nil, data: nextVC!.displayView, index: $0)
+        nextVC?.onCellLongTouch = {(cellPoint:CGPoint,touch:CGPoint) in
+            let indexPath = nextVC?.table?.indexPathForRow(at: cellPoint)
+            if(indexPath != nil){
+                popupLongCellTouch(view: nextVC!, custom: nil, data: nextVC!.displayView, index: indexPath!.row, point: touch)
+            }
         }
         
         nextVC?.menuInfo[3] = "更新"
@@ -392,6 +403,8 @@ class Manager {
                     newTotalData.append($0)
                 }
                 
+                newTotalData = Parse.setRelationParentRes(raw: newTotalData)
+                
                 DispatchQueue.main.async {
                     let isTree = nextVC?.FirstMenu.titleLabel?.text == "レス順"
                     
@@ -413,24 +426,23 @@ class Manager {
                         }
                         nextVC?.storage = Parse.setRelationParentRes(raw: nextVC?.storage.map{Res(cast: $0)} ?? [])
                     }else{
-                        var isfirstRes = true
-                        nextVC?.displayView.removeAll()
-                        thread.res.forEach{
-                            nextVC?.displayView.append($0)
+                        //TODO: Notツリーモード時に安価データベースの再構築を行う
+                        if(updatedData.count > 0){
+                            nextVC?.displayView.removeAll()
+                            //新着フラグをつけ直す
+                            for i in 0..<newTotalData.count{
+                                if(updatedData[0].num == newTotalData[i].num){
+                                    newTotalData[i].isSinchaku = true
+                                }else{
+                                    newTotalData[i].isSinchaku = false
+                                }
+                                nextVC?.displayView.append(Res(cast: newTotalData[i]))
+                            }
+                            for newRes in updatedData{
+                                nextVC?.storage.append(Res(cast: newRes))
+                            }
                         }
                         
-                        updatedData.forEach{
-                            
-                            if isfirstRes{
-                                isfirstRes = false
-                                let res = $0
-                                res.isSinchaku = true
-                                nextVC?.displayView.append(res)
-                            }else{
-                                nextVC?.displayView.append($0)
-                            }
-                            nextVC?.storage.append($0)
-                        }
                         nextVC?.storage = Parse.setRelationParentRes(raw: nextVC?.storage.map{Res(cast: $0)} ?? [])
                     }
                     
@@ -558,14 +570,14 @@ class Manager {
         return nextVC
     }
     
-    static func popupResMenu(view:SuperTable?,custom:popupTable?,index:Int,datas:[SaveTypeTag]) {
+    static func popupResMenu(view:SuperTable?,custom:popupTable?,index:Int,datas:[SaveTypeTag],point:CGPoint?) {
         let res = datas[index] as! Res
-        
-        let menu = UIAlertController(title: "", message: String(res.num)+" 名前: "+res.writterName+" "+String(Parse().jpDateFormater.string(from: res.date)+" ID:"+res.writterId), preferredStyle: UIAlertController.Style.actionSheet)
+        let beforeView = view != nil ? view : custom
+        let menu = UIAlertController(title: "", message:
+            String(res.num)+" 名前: "+res.writterName+" "+res.date+" ID:"+res.writterId
+            , preferredStyle: UIAlertController.Style.actionSheet)
         let copy = UIAlertAction(title: "コピー", style: UIAlertAction.Style.default, handler: {
             (formaction: UIAlertAction!) in
-            
-            let beforeView = view != nil ? view : custom
             if(beforeView != nil){
                 popupCopyView(view: beforeView!, res: res)
             }
@@ -591,8 +603,7 @@ class Manager {
         
         let hissi = UIAlertAction(title: "必死チェッカー", style: UIAlertAction.Style.default, handler: {
             (formaction: UIAlertAction!) in
-            print((view?.parent as? Thread)?.url)
-            print((custom?.parent as? Thread)?.url)
+            
         })
         
         let cancel = UIAlertAction(title: "キャンセル", style: UIAlertAction.Style.cancel, handler: {
@@ -608,20 +619,27 @@ class Manager {
         menu.addAction(hissi)
         menu.addAction(cancel)
         
+        let defaultHeight = CGFloat(integerLiteral: 0)
+            //UIApplication.shared.statusBarFrame.size.height+(beforeView?.navigationController?.navigationBar.frame.size.height ?? 0)
+        
         if(view != nil){
+            menu.popoverPresentationController?.sourceView = view!.view
+            menu.popoverPresentationController?.sourceRect = CGRect(x: point?.x ?? 0, y: (point?.y ?? 0)+defaultHeight, width: 0, height: 0)
             view?.present(menu, animated: true, completion: nil)
         }else if(custom != nil){
+            menu.popoverPresentationController?.sourceView = custom!.view
+            menu.popoverPresentationController?.sourceRect = CGRect(x: point?.x ?? 0, y: (point?.y ?? 0)+defaultHeight , width: 0, height: 0)
             custom?.present(menu, animated: true, completion: nil)
         }
     }
     
-    static func popupLongCellTouch(view:SuperTable?,custom:popupTable?,data:[SaveTypeTag],index:Int){
-        Manager.popupResMenu(view: view, custom: custom, index: index, datas: data)
+    static func popupLongCellTouch(view:SuperTable?,custom:popupTable?,data:[SaveTypeTag],index:Int,point:CGPoint?){
+        Manager.popupResMenu(view: view, custom: custom, index: index, datas: data,point: point)
     }
     
     static func popupCopyView(view:UIViewController,res:Res) {
         let popup = view.storyboard?.instantiateViewController(withIdentifier: "editres") as! ResponseEditView
-        let bodyData = String(res.num)+" "+res.writterName+" "+String(Parse().jpDateFormater.string(from: res.date)+" ID:"+res.writterId)+"\n"+res.body
+        let bodyData = String(res.num)+" "+res.writterName+" "+res.date+" ID:"+res.writterId+"\n"+res.body
         
         popup.titleMes = ">>"+String(res.num)+"のコピー"
         popup.bodyString = bodyData

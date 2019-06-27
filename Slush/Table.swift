@@ -6,7 +6,7 @@
 //
 
 import UIKit
-import SafariServices
+import WebKit
 
 protocol TapbleCell {
     var onCellTouch:((_ touchdedData:Int)->Void) {get set}
@@ -148,7 +148,7 @@ class NewResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
                 let filter = SearchFilter()
                 filter.searchWord = self.selfData.writterId
                 filter.filter = .ID
-                filter.rawRes = self.selfResponses
+                filter.rawRes = self.selfResponses.map{Res(cast: $0 as SaveTypeTag)}
                 Manager.addCustomSearch(all:self.selfResponses , view: self.nowview!, option: filter)
             }
         }else if(touch.tag == 2){
@@ -157,7 +157,7 @@ class NewResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
                 let filter = SearchFilter()
                 filter.searchNum = [self.selfData.num]
                 filter.filter = .REPLY
-                filter.rawRes = self.selfResponses
+                filter.rawRes = self.selfResponses.map{Res(cast: $0 as SaveTypeTag)}
                 Manager.addCustomSearch(all:self.selfResponses ,view: self.nowview!, option: filter)
             }
         }else if(touch.tag == 3){
@@ -166,7 +166,7 @@ class NewResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
                 let filter = SearchFilter()
                 filter.searchWord = self.selfData.writterName
                 filter.filter = .NAME
-                filter.rawRes = self.selfResponses
+                filter.rawRes = self.selfResponses.map{Res(cast: $0 as SaveTypeTag)}
                 Manager.addCustomSearch(all:self.selfResponses ,view: self.nowview!, option: filter)
             }
         }
@@ -223,16 +223,17 @@ class NewResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
             NSAttributedString.Key.foregroundColor: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1)
         ]
         
-        
-        for url in Pattern().getUrlLink(data: data.body){
+        //print(data.urls.count)
+        for url in data.urls{
             var runUrl = url
+            print(url)
             let range = NSString(string: attributedString.string).range(of: runUrl)
-            if(!runUrl.hasPrefix("h")){
-                runUrl = "h"+runUrl
-            }
+//            if(!runUrl.hasPrefix("h")){
+//                runUrl = "h"+runUrl
+//            }
             attributedString.addAttribute(
                 NSAttributedString.Key.link,
-                value: runUrl,
+                value: "g"+runUrl,
                 range: range)
         }
         
@@ -246,11 +247,9 @@ class NewResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
                 range: range)
         }
         
-        
-        
         self.body.attributedText = attributedString
         
-        self.date.text = Parse().jpDateFormater.string(from: data.date)
+        self.date.text = data.date
         
         var id = data.writterId
         if(write_count > 1 && data.writterName != ""){
@@ -281,7 +280,7 @@ class NewResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
                 self.treeSpace.constant = CGFloat(4)
             }else{
                 self.treeWall.backgroundColor = #colorLiteral(red: 0.9372549057, green: 0.9372549057, blue: 0.9568627477, alpha: 1)
-                self.treeSpace.constant = CGFloat((Float(8) * Float(data.treeDepth)))
+                self.treeSpace.constant = CGFloat((10)+(Float(8) * Float(data.treeDepth-1)))
             }
         }else{
             self.treeWall.backgroundColor = #colorLiteral(red: 0.168627451, green: 0.1675006281, blue: 0.168627451, alpha: 1)
@@ -312,10 +311,22 @@ class NewResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
                 Manager.addCustomSearch(all: self.selfResponses, view: self.nowview!, option: filter)
             }
             
-            
-        }else if(url.absoluteString.hasPrefix("http")){
-            //let controller = SFSafariViewController(url: url)
-            //self.nowview?.present(controller, animated: true)
+        }else if(url.absoluteString.hasPrefix("ghttp")){
+            let link = url.absoluteString.replacingOccurrences(of: "ghttp://", with: "http://").replacingOccurrences(of: "ghttps://", with: "https://").replacingOccurrences(of: "gttps://", with: "https://").replacingOccurrences(of: "gttp://", with: "http://")
+            if(link.hasSuffix(".png")||link.hasSuffix(".PNG")||link.hasSuffix(".jpg")||link.hasSuffix(".JPG")||link.hasSuffix(".gif")||link.hasSuffix(".GIF")){
+                guard let nextVC = nowview?.storyboard?.instantiateViewController(withIdentifier: "pictureview") as? PictureView else{
+                    return true
+                }
+                nextVC.urlString = link
+                nowview?.present(nextVC, animated: true, completion: nil)
+                
+            }else{
+                guard let nextVC = nowview?.storyboard?.instantiateViewController(withIdentifier: "webview") as? WebView else{
+                    return true
+                }
+                nextVC.url = link
+                nowview?.present(nextVC, animated: true, completion: nil)
+            }
             return true
         }
         return false
@@ -378,6 +389,9 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
     }
     
     @objc func onTouchLabel(sender:UITapGestureRecognizer) {
+        //タッチした座標
+        //let point = sender.location(in: nowview?.view)
+        
         let touch:UILabel = (sender.view as! UILabel)
         if(touch.tag == 1){
             //print(self.selfData.writterId)
@@ -415,15 +429,6 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
         self.selfResponses = all
         self.selfData = data
         
-//        if(data.isSinchaku){
-//            self.sinchaku.isHidden = false
-//        }else{
-//            self.sinchaku.frame = CGRect(x: self.sinchaku.frame.origin.x, y: self.sinchaku.frame.origin.y, width: self.sinchaku.frame.width, height: 0)
-//            self.sinchaku.isHidden = true
-//        }
-        
-        //self.selfThread = datas
-        
         let isNotIDThread = data.writterId.count == 0 ? true : false
         let isThreadFirstWritter = all[0].writterId == data.writterId
         
@@ -459,20 +464,14 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
         self.body.linkTextAttributes = [
             NSAttributedString.Key.foregroundColor: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1)
         ]
-        
-        
-        for url in Pattern().getUrlLink(data: data.body){
+        for url in data.urls{
             var runUrl = url
             let range = NSString(string: attributedString.string).range(of: runUrl)
-            if(!runUrl.hasPrefix("h")){
-                runUrl = "h"+runUrl
-            }
             attributedString.addAttribute(
                 NSAttributedString.Key.link,
-                value: runUrl,
+                value: "g"+runUrl,
                 range: range)
         }
-        
         for i in 0..<data.toRef.count{
             //print(i.0)
             let anchor = data.toRef[i]
@@ -483,12 +482,8 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
                 range: range)
         }
 
-        
-        
         self.body.attributedText = attributedString
-        
-        self.date.text = Parse().jpDateFormater.string(from: data.date)
-        
+        self.date.text = data.date
         var id = data.writterId
         if(write_count > 1 && data.writterName != ""){
             id +=  " ("+String(writer_now_count) + "/"+String(write_count) + ")"
@@ -506,12 +501,10 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
         self.num.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(ResponseCell.onTouchLabel(sender:))))
         
         self.body.textColor = .white
-        
         self.name.text = data.writterName
         self.name.tag = 3
         self.name.isUserInteractionEnabled = true
         self.name.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(ResponseCell.onTouchLabel(sender:))))
-        
         if(isCustomMode){
             if(data.treeDepth == 0){
                 self.treeWall.backgroundColor = #colorLiteral(red: 0.168627451, green: 0.1675006281, blue: 0.168627451, alpha: 1)
@@ -528,17 +521,12 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
     }
     
     func textView(_ textView: UITextView,shouldInteractWith url: URL,in characterRange: NSRange,interaction: UITextItemInteraction) -> Bool {
-        
-        //print(url)
+
         
         if(url.absoluteString.hasPrefix("res://")){
-            //print(url)
-            //print(url.absoluteString)
             DispatchQueue.global().async {
                 let removedHead = url.absoluteString.replacingOccurrences(of: "res://", with: "")
                 let targetAddress = removedHead.components(separatedBy: "/").map{Int($0) ?? 0}
-                    //removedHead.components(separatedBy: "/").map{Int($0) ?? 0}
-                //print(targetAddress)
                 let filter = SearchFilter()
                 filter.rawRes = self.selfResponses
                 filter.searchNum = targetAddress
@@ -550,9 +538,22 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
             }
             
             
-        }else if(url.absoluteString.hasPrefix("http")){
-            //let controller = SFSafariViewController(url: url)
-            //self.nowview?.present(controller, animated: true)
+        }else if(url.absoluteString.hasPrefix("gttp") || url.absoluteString.hasPrefix("ghttp")){
+            let link = url.absoluteString.replacingOccurrences(of: "ghttp://", with: "http://").replacingOccurrences(of: "ghttps://", with: "https://").replacingOccurrences(of: "gttps://", with: "https://").replacingOccurrences(of: "gttp://", with: "http://")
+            if(link.hasSuffix(".png")||link.hasSuffix(".PNG")||link.hasSuffix(".jpg")||link.hasSuffix(".JPG")||link.hasSuffix(".gif")||link.hasSuffix(".GIF")){
+                guard let nextVC = nowview?.storyboard?.instantiateViewController(withIdentifier: "pictureview") as? PictureView else{
+                    return true
+                }
+                nextVC.urlString = link
+                nowview?.present(nextVC, animated: true, completion: nil)
+                
+            }else{
+                guard let nextVC = nowview?.storyboard?.instantiateViewController(withIdentifier: "webview") as? WebView else{
+                    return true
+                }
+                nextVC.url = link
+                nowview?.present(nextVC, animated: true, completion: nil)
+            }
             return true
         }
         return false
@@ -560,12 +561,6 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
     
 }
 
-class EndCell: UITableViewCell {
-    static func create() -> UITableViewCell {
-        let cell = EndCell()
-        return cell
-    }
-}
 class UIStatus {
     //Managerのインデックス
     var server:Int = -1
@@ -615,11 +610,119 @@ protocol Table {
     var onMenuTouch: [((_ view:SuperTable)->Void)?] {get set}
 }
 
+class WebView :UIViewController, WKNavigationDelegate, WKUIDelegate{
+    
+    
+    var url:String? = ""
+    
+    @IBOutlet weak var titleBar: UILabel!
+    
+    @IBOutlet weak var webview: WKWebView!
+    
+    @IBOutlet weak var outOfRangeBtn: UIButton!
+    
+    @IBOutlet weak var progressbar: UIProgressView!
+    
+    @IBAction func onOutOfRange(_ sender: Any) {
+        self.outOfRangeBtn.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0)
+        dismiss(animated: true, completion: nil)
+    }
+    
+    
+    @IBOutlet weak var back: UIButton!
+    
+    @IBOutlet weak var forward: UIButton!
+    
+    @IBOutlet weak var reload: UIButton!
+    
+    @IBOutlet weak var share: UIButton!
+    
+    @IBAction func onBack(_ sender: Any) {
+        self.webview.goBack()
+    }
+    
+    @IBAction func onForward(_ sender: Any) {
+        self.webview.goForward()
+    }
+    
+    @IBAction func onReload(_ sender: Any) {
+        self.webview.reload()
+        titleBar.text = self.webview.title
+    }
+    
+    @IBAction func onShare(_ sender: Any) {
+        let alert: UIAlertController = UIAlertController(title: "共有...", message: "", preferredStyle:  UIAlertController.Style.actionSheet)
+        
+        let openSafari: UIAlertAction = UIAlertAction(title: "Safariで開く", style: UIAlertAction.Style.default, handler:{
+            (action: UIAlertAction!) -> Void in
+            let openurl = URL(string: self.url ?? "")!
+            if(UIApplication.shared.canOpenURL(openurl)){
+                UIApplication.shared.open(openurl)
+            }
+        })
+        let copy: UIAlertAction = UIAlertAction(title: "クリップボードにコピー", style: UIAlertAction.Style.default, handler:{
+            (action: UIAlertAction!) -> Void in
+            let board = UIPasteboard.general
+            board.string = self.url == nil ? board.string : self.url!
+        })
+        
+        // Cancelボタン
+        let cancelAction: UIAlertAction = UIAlertAction(title: "cancel", style: UIAlertAction.Style.cancel, handler:{(action: UIAlertAction!) -> Void in})
+        
+        alert.addAction(openSafari)
+        alert.addAction(copy)
+        alert.addAction(cancelAction)
+        alert.popoverPresentationController?.sourceView = self.view
+        present(alert, animated: true, completion: nil)
+    }
+    
+    override func viewDidLoad() {
+        //読み込み状態が変更されたことを取得
+        self.webview.addObserver(self, forKeyPath: "loading", options: .new, context: nil)
+        //プログレスが変更されたことを取得
+        self.webview.addObserver(self, forKeyPath: "estimatedProgress", options: .new, context: nil)
+        
+        self.webview.load(URLRequest(url:URL(string: url ?? "")!))
+        titleBar.text = self.webview.title
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5){
+            self.outOfRangeBtn.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0.350390625)
+        }
+    }
+    
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        self.view.endEditing(true)
+    }
+    
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        if keyPath == "estimatedProgress"{
+            self.progressbar.setProgress(Float(self.webview.estimatedProgress), animated: true)
+        }else if keyPath == "loading"{
+            UIApplication.shared.isNetworkActivityIndicatorVisible = self.webview.isLoading
+            if self.webview.isLoading {
+                self.progressbar.setProgress(0.1, animated: true)
+            }else{
+                //読み込みが終わったら0に
+                self.progressbar.setProgress(0.0, animated: false)
+            }
+        }
+    }
+    
+    deinit{
+        //消さないと、アプリが落ちる
+        self.webview.removeObserver(self, forKeyPath: "estimatedProgress")
+        self.webview.removeObserver(self, forKeyPath: "loading")
+    }
+    
+    
+}
+
 class postTable :UIViewController{
     
     
     var titleMes = ""
     var bodyMes = ""
+    
+    @IBOutlet weak var sizeview:UIView!
     
     @IBOutlet weak var titleBar: UILabel!
 
@@ -665,7 +768,6 @@ class popupTable : UIViewController, UITableViewDelegate , UITableViewDataSource
     
     @IBOutlet weak var table: UITableView?
     
-    
     @IBOutlet weak var height: NSLayoutConstraint!
     
     var displayView: [SaveTypeTag]?
@@ -674,7 +776,7 @@ class popupTable : UIViewController, UITableViewDelegate , UITableViewDataSource
     
     var onCellTouch: ((Int) -> Void)?
     
-    var onCellLongTouch: ((Int) -> Void)?
+    var onCellLongTouch: ((CGPoint,CGPoint) -> Void)?
     
     //var onCreateCell: ((Int, SuperTable) -> UITableViewCell)?
     var onCreateCell: ((Int, popupTable) -> UITableViewCell)?
@@ -694,6 +796,25 @@ class popupTable : UIViewController, UITableViewDelegate , UITableViewDataSource
         dismiss(animated: true, completion: nil)
     }
 
+//    override func viewDidAppear(_ animated: Bool) {
+//        NotificationCenter.default.addObserver(self,selector: #selector(self.rotationChange(notification:)),name: UIDevice.orientationDidChangeNotification,object: nil)
+//    }
+//    
+//    @objc
+//    func rotationChange(notification: NSNotification){
+//        
+//        //safeAreaFrameが上の青い部分のCGRect.
+//        let safeAreaFrame = self.view.safeAreaLayoutGuide.layoutFrame
+//        let safeAreaHeight = safeAreaFrame.width
+//        let safeAreaWidth = safeAreaFrame.height
+//        
+//        outofrange.frame.size = CGSize(width: safeAreaWidth, height: safeAreaHeight )
+//        table?.frame.size = CGSize(width: safeAreaWidth, height: safeAreaHeight)
+//        table?.frame = CGRect(x: safeAreaFrame.origin.x, y: safeAreaWidth.origin.y, width: safeAreaWidth, height: safeAreaHeight)
+//        table?.setNeedsDisplay()
+//        table?.reloadData()
+//    }
+    
     override func viewDidLayoutSubviews() {
         self.view.layoutIfNeeded()
         if(table?.contentSize.height ?? 0 < table?.frame.size.width ?? 0){
@@ -745,19 +866,6 @@ class popupTable : UIViewController, UITableViewDelegate , UITableViewDataSource
             cell = table?.dequeueReusableCell(withIdentifier: "basiccell")
             cell?.textLabel?.text = "Error"
         }
-        //cellheight += cell?.contentView.bounds.height ?? 0
-        //print(cellheight)
-        
-        //変更したで
-//        if(indexPath.row == (displayView?.count ?? 0)-1){
-//            //print(cellheight)
-//            if(table?.contentSize.height ?? 0 < table?.frame.size.width ?? 0){
-//
-//                height.constant = tableView.contentSize.height
-//
-//            }
-//        }
-        
         cell!.layoutMargins = UIEdgeInsets.zero
         return cell!
     }
@@ -780,7 +888,7 @@ class popupTable : UIViewController, UITableViewDelegate , UITableViewDataSource
         if indexPath == nil {
             // 長押し位置に対する行数が取得できなければ何もしない
         } else if recognizer.state == UIGestureRecognizer.State.began {
-            onCellLongTouch?(indexPath!.row)
+            onCellLongTouch?(point,recognizer.location(in: self.view))
         }
     }
 }
@@ -800,6 +908,99 @@ class ResponseEditView: UIViewController {
         titleBar.text = titleMes ?? ""
         body.text = bodyString ?? ""
     }
+    
+    @IBAction func onTouchOutOfRange(_ sender: Any) {
+        self.outofrange.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0)
+        dismiss(animated: true, completion: nil)
+    }
+    
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        self.view.endEditing(true)
+    }
+}
+
+class PictureView: UIViewController,UIScrollViewDelegate{
+    
+    
+    @IBOutlet weak var titleBar: UILabel!
+    
+    @IBOutlet weak var scrollView: UIScrollView!
+    
+    @IBOutlet weak var outofrange: UIButton!
+    
+    var imageView: UIImageView? = nil
+    
+    var urlString:String? = ""
+    
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+        return self.imageView
+    }
+    
+    
+    
+    @objc func doubleTap(gesture:UITapGestureRecognizer) -> Void {
+        if(self.scrollView.zoomScale < 3){
+            let newScale:CGFloat = self.scrollView.zoomScale*3
+            let zoomRect:CGRect = self.zoomForScale(scale:newScale, center:gesture.location(in:gesture.view))
+            self.scrollView.zoom(to:zoomRect, animated: true)
+        } else {
+            self.scrollView.setZoomScale(1.0, animated: true)
+        }
+    }
+    
+    func zoomForScale(scale:CGFloat, center: CGPoint) -> CGRect{
+        var zoomRect: CGRect = CGRect()
+        zoomRect.size.height = self.scrollView.frame.size.height / scale
+        zoomRect.size.width = self.scrollView.frame.size.width  / scale
+        zoomRect.origin.x = center.x - zoomRect.size.width / 2.0
+        zoomRect.origin.y = center.y - zoomRect.size.height / 2.0
+        return zoomRect
+    }
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        titleBar.text = "読み込み中..."
+        scrollView.delegate = self
+        
+        scrollView.isUserInteractionEnabled = true
+        // 最大・最小の大きさを決める
+        scrollView.maximumZoomScale = 4.0
+        scrollView.minimumZoomScale = 1.0
+        scrollView.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0.350390625)
+        // ダブルタップ対応
+        let doubleTap = UITapGestureRecognizer(target:self,action:#selector(PictureView.doubleTap(gesture:)))
+        
+        doubleTap.numberOfTapsRequired = 2
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5){
+            self.outofrange.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0.350390625)
+        }
+        if(urlString != nil){
+            DispatchQueue.global().async {
+                let data = HttpClientImpl().convertImage(url: self.urlString!)
+                if(data.image != nil){
+                    let urls = self.urlString!.components(separatedBy: "/")
+                    DispatchQueue.main.async {
+                        self.imageView = UIImageView()
+                        self.imageView?.image = data.image
+                        self.imageView?.frame = self.scrollView.frame
+                        self.imageView?.isUserInteractionEnabled = true
+                        self.imageView?.addGestureRecognizer(doubleTap)
+                        self.imageView?.contentMode = .scaleAspectFit
+                        self.imageView?.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0.350390625)
+                        self.scrollView.addSubview(self.imageView ?? UIImageView())
+                        self.titleBar.text = urls[urls.count-1]
+                    }
+                }else{
+                    DispatchQueue.main.async {
+                        self.titleBar.text = "エラー 画像が破損しています"
+                    }
+                }
+            }
+        }
+    }
+    
+    
     
     @IBAction func onTouchOutOfRange(_ sender: Any) {
         self.outofrange.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0)
@@ -847,7 +1048,7 @@ class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIG
     
     var onCellTouch: ((Int) -> Void)? = nil
     
-    var onCellLongTouch: ((Int) -> Void)? = nil
+    var onCellLongTouch: ((CGPoint,CGPoint) -> Void)? = nil
     
     var cellGetter:((_ tag:String)->UITableViewCell?)? = nil
     
@@ -935,7 +1136,6 @@ class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIG
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        //print(indexPath.row)
         var cell = onCreateCell?(indexPath.row ,self)
         if(cell == nil){
             cell = table?.dequeueReusableCell(withIdentifier: "basiccell")
@@ -954,7 +1154,7 @@ class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIG
         if indexPath == nil {
             // 長押し位置に対する行数が取得できなければ何もしない
         } else if recognizer.state == UIGestureRecognizer.State.began {
-            onCellLongTouch?(indexPath!.row)
+            onCellLongTouch?(point,recognizer.location(in: self.view))
         }
     }
     //TableViewの余計な線を消すやつ https://qiita.com/edm/items/db0edf4057c2e77da308
