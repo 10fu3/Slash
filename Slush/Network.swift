@@ -31,11 +31,16 @@ public class HttpClientImpl{
             }
             .resume()
         _ = semaphore.wait(timeout: DispatchTime.distantFuture)
+        print("通信終わり")
         return (d, r, e)
     }
     
     public func convertImage(url:String) -> (data:Data,image:UIImage?) {
         let data = getDatafromHTTP(url: url)
+        if(url.hasSuffix(".gif")){
+            return (data,UIImage.gif(data: data))
+        }
+        
         return (data,UIImage(data: data) ?? UIImage())
     }
     
@@ -124,16 +129,48 @@ public class HttpClientImpl{
         return Data()
     }
     
+    public func postDatafromHTTP(url:String,params:String) -> Data {
+        let url = URL(string: url)!
+        let req = NSMutableURLRequest(url: url)
+        req.httpMethod = "HEAD"
+        let (head, res, _) = execute(request: (req as URLRequest))
+        
+        //50MB超えで空データ 画像爆弾が効かないように
+        if(((res as? HTTPURLResponse)?.expectedContentLength ?? 0) > 51200000){
+            return Data()
+        }
+        
+        req.httpMethod = "POST"
+        req.httpBody = params.data(using: .utf8)
+        let (rawdata, _, _) = execute(request: (req as URLRequest))
+        
+        if rawdata != nil{
+            return Data.init(referencing: rawdata ?? NSData())
+        }
+        return Data()
+    }
+    
+    func postURL(url:String,params:[String:String]) -> Data {
+        var param = ""
+        for i in params{
+            if(param.count >= 0){
+                param += "&"
+            }
+            param += (i.key+"="+i.value)
+        }
+        return postDatafromHTTP(url: url, params: param)
+    }
+    
+    func postUrlParsedString(url:String,params:String,encode:String.Encoding) -> String {
+        return String(data: postDatafromHTTP(url: url, params: params), encoding: encode) ?? ""
+    }
+    
+    
+    func postUrlParsedString(url:String,params:[String:String],encode:String.Encoding) -> String {
+        return String(data: postURL(url: url, params: params), encoding: encode) ?? ""
+    }
+    
     func getDataByUrl(url: String) -> Data{
         return getDatafromHTTP(url: url)
-//        let url = URL(string: url)
-//        do {
-//
-//            let data = try Data(contentsOf: url!)
-//            return data
-//        } catch let err {
-//            print("Error : \(err.localizedDescription)")
-//        }
-//        return Data()
     }
 }

@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import RealmSwift
 import UIKit
 
 
@@ -135,6 +134,9 @@ class Manager {
             cell.setData(view: v, data: category[i])
             return cell
         }
+        nextVC?.onOtherMenu = {
+            nextVC?.navigationController?.pushViewController(Manager.createHistoryTable(view: nextVC!)!, animated: true)
+        }
         nextVC?.navigationItem.title = server.title
         return nextVC
     }
@@ -154,6 +156,9 @@ class Manager {
             let cell = v.cellGetter!("basiccell") as! BasicCell
             cell.setData(view: v, data: board[i])
             return cell
+        }
+        nextVC?.onOtherMenu = {
+            nextVC?.navigationController?.pushViewController(Manager.createHistoryTable(view: nextVC!)!, animated: true)
         }
         nextVC?.navigationItem.title = category.title
         return nextVC
@@ -230,8 +235,12 @@ class Manager {
         nextVC?.onMenuTouch[1] = { view in
             DispatchQueue.global().async {
                 let array = nextVC?.storage.sorted(by: { (a, b) -> Bool in
-                    
-                    return (a as! Thread).date > (b as! Thread).date
+                    //未来になぜかスレが立ってる場合は除外
+                    if !(((a as! Thread).date) > Date()){
+                        return (a as! Thread).date > (b as! Thread).date
+                    }else{
+                        return false
+                    }
                 }) ?? []
                 
                 
@@ -261,7 +270,10 @@ class Manager {
         
         nextVC?.menuInfo[5] = "スレ建て"
         nextVC?.onMenuTouch[5] = { data in
-            
+            popupPostMenu(view: nextVC!, data: [board], index: nil, isInyou: false)
+        }
+        nextVC?.onOtherMenu = {
+            nextVC?.navigationController?.pushViewController(Manager.createHistoryTable(view: nextVC!)!, animated: true)
         }
         
         nextVC?.navigationItem.title = board.title
@@ -328,6 +340,18 @@ class Manager {
         }
     }
     
+    static func createHistoryTable(view:SuperTable) -> UIViewController? {
+        let nextVC = view.storyboard?.instantiateViewController(withIdentifier: "table") as? SuperTable
+        nextVC?.isFirst = false
+        nextVC?.tableMode = .BOARD_HIS
+        nextVC?.navigationItem.title = "閲覧 板"
+        nextVC?.progress?.isHidden = true
+        
+        nextVC?.menuInfo = ["","お気に入り","閲覧履歴","更新","書込履歴","並び順",""]
+        
+        return nextVC
+    }
+    
     static func createResTable(view:SuperTable,data:SaveTypeTag) -> UIViewController? {
         //サーバーのセルがタップされたとき
         var thread = data as! Thread
@@ -338,7 +362,7 @@ class Manager {
         
         thread = Parse().getThread(thread: thread, onDownload: {
             DispatchQueue.main.async {
-                ToastView.showText(text: "ダウンロード開始")
+               var _ =  ToastView.showText(text: "ダウンロード開始")
             }
         }, onParse: { part,all in
             DispatchQueue.main.async {
@@ -362,7 +386,7 @@ class Manager {
         nextVC?.isFirst = false
         nextVC?.tableMode = .RESPONSE
         DispatchQueue.main.async {
-            ToastView.showText(text: "読み込み中...")
+            var _ = ToastView.showText(text: "読み込み中...")
         }
         nextVC?.storage = thread.res.map{$0}
         nextVC?.displayView = thread.res.map{$0}
@@ -381,7 +405,9 @@ class Manager {
                 popupLongCellTouch(view: nextVC!, custom: nil, data: nextVC!.displayView, index: indexPath!.row, point: touch)
             }
         }
-        
+        nextVC?.onOtherMenu = {
+            nextVC?.navigationController?.pushViewController(Manager.createHistoryTable(view: nextVC!)!, animated: true)
+        }
         nextVC?.menuInfo[3] = "更新"
         nextVC?.onMenuTouch[3] = { data in
             
@@ -398,6 +424,10 @@ class Manager {
                 //差分データ
                 let updatedData = Parse().updateThread(thread: thread).res
                 
+                if updatedData.count <= 0{
+                    return
+                }
+                
                 var newTotalData = thread.res.map{$0}
                 updatedData.forEach{
                     newTotalData.append($0)
@@ -407,7 +437,7 @@ class Manager {
                 
                 DispatchQueue.main.async {
                     let isTree = nextVC?.FirstMenu.titleLabel?.text == "レス順"
-                    
+                    thread.res.forEach{$0.isSinchaku = false}
                     if isTree{
                         var parsedata = (Parse().parseTreeArrayPartOfUpdate(old: nextVC?.storage.map{Res(cast: $0)} ?? [], update: updatedData))
                         
@@ -445,7 +475,6 @@ class Manager {
                         
                         nextVC?.storage = Parse.setRelationParentRes(raw: nextVC?.storage.map{Res(cast: $0)} ?? [])
                     }
-                    
                     ToastView.showText(text: "新着 "+String(updatedData.count)+"件")
                     //nextVC?.displayView = updatedData
                     nextVC?.onCreateCell = { (i:Int,v:SuperTable) in
@@ -471,14 +500,45 @@ class Manager {
                     }
                     (nextVC?.parentData as! Thread).res = newTotalData
                     nextVC?.table?.reloadData()
-                    
+                    if(nextVC?.isAutoScroll ?? false){
+                        nextVC?.table?.scrollToRow(at: IndexPath(row: (nextVC?.displayView.count ?? 1) - 1, section: 0),
+                                                   at: UITableView.ScrollPosition.bottom, animated: true)
+                    }
                     
                 }
             }
         }
         
         nextVC?.onMenuLongTouch[3] = { table in
-            ToastView.showText(text: "オートリロードON")
+            
+            if(nextVC?.timer == nil){
+                ToastView.showText(text: "オートリロードON")
+                var time = 0
+                nextVC?.timer = Timer.scheduledTimer(withTimeInterval: TimeInterval.init(exactly: 5.0)!, repeats: true, block: {_ in
+                    nextVC?.isAutoScroll = true
+                    nextVC?.onMenuTouch[3]?(nextVC!)
+                    time += 5
+                    if(time >= 1800){
+                        time = 0
+                        nextVC?.isAutoScroll = false
+                        nextVC?.timer?.invalidate()
+                        nextVC?.timer = nil
+                    }
+                    print("アプデ開始")
+                })
+                
+                
+                nextVC?.onDisappearView.append {
+                    ToastView.showText(text: "オートリロードOFF")
+                    nextVC?.timer?.invalidate()
+                    nextVC?.timer = nil
+                }
+            }else{
+                nextVC?.isAutoScroll = false
+                ToastView.showText(text: "オートリロードOFF")
+                nextVC?.timer?.invalidate()
+                nextVC?.timer = nil
+            }
         }
         
         nextVC?.menuInfo[1] = "ツリー"
@@ -573,6 +633,9 @@ class Manager {
     static func popupResMenu(view:SuperTable?,custom:popupTable?,index:Int,datas:[SaveTypeTag],point:CGPoint?) {
         let res = datas[index] as! Res
         let beforeView = view != nil ? view : custom
+        let thread = (view?.parentData) as? Thread
+        let url = thread?.url ?? ""
+        
         let menu = UIAlertController(title: "", message:
             String(res.num)+" 名前: "+res.writterName+" "+res.date+" ID:"+res.writterId
             , preferredStyle: UIAlertController.Style.actionSheet)
@@ -598,14 +661,9 @@ class Manager {
         
         let ng = UIAlertAction(title: "NGする", style: UIAlertAction.Style.default, handler: {
             (formaction: UIAlertAction!) in
-            print("ng")
+            //ID or NAME or Number
         })
-        
-        let hissi = UIAlertAction(title: "必死チェッカー", style: UIAlertAction.Style.default, handler: {
-            (formaction: UIAlertAction!) in
-            
-        })
-        
+
         let cancel = UIAlertAction(title: "キャンセル", style: UIAlertAction.Style.cancel, handler: {
             (formaction: UIAlertAction!) in
             print("cancel")
@@ -616,7 +674,39 @@ class Manager {
         menu.addAction(quote)
         menu.addAction(setsiori)
         menu.addAction(ng)
-        menu.addAction(hissi)
+        
+        if url.contains("5ch.net"){
+            let hissi = UIAlertAction(title: "必死チェッカー", style: UIAlertAction.Style.default, handler: {
+                (formaction: UIAlertAction!) in
+                if(url.contains("5ch.net")){
+                    let id = res.writterId
+                    let dateSet = res.date.components(separatedBy: "(")[0].components(separatedBy: "/")
+                    let date = dateSet[0]+dateSet[1]+dateSet[2]
+                    if(url.count <= 0){
+                        return
+                    }else{
+                        let boardid = (thread?.boardID ?? "")
+                        let hissiurl = "http://hissi.org/read.php/"+boardid+"/search/"
+                        let params = "date="+date+"&ID="+id
+                        DispatchQueue.global().async {
+                            let targeturl = "http://hissi.org/read.php/"+boardid+HttpClientImpl().postUrlParsedString(url: hissiurl, params: params, encode: .utf8).replacingOccurrences(of: "<meta http-equiv=\"refresh\" content=\"0; url=..", with: "").replacingOccurrences(of: "\">", with: "")
+                            print(targeturl)
+                            DispatchQueue.main.async {
+                                guard let nextVC = view?.storyboard?.instantiateViewController(withIdentifier: "webview") as? WebView else{
+                                    return
+                                }
+                                nextVC.url = targeturl
+                                view?.present(nextVC, animated: true, completion: nil)
+                                nextVC.titleBar.text = id+" の必死 - "+date
+                            }
+                            
+                        }
+                    }
+                }
+            })
+            
+            menu.addAction(hissi)
+        }
         menu.addAction(cancel)
         
         let defaultHeight = CGFloat(integerLiteral: 0)
@@ -654,7 +744,7 @@ class Manager {
         let res = data as? [Res]
         let board = data as? [Board]
         let thread = data as? [Thread]
-        let popup = view.storyboard?.instantiateViewController(withIdentifier: "write") as! postTable
+        let popup = view.storyboard?.instantiateViewController(withIdentifier: "write") as! PostTable
         if(res != nil && index != nil){
             popup.bodyMes += ">>"+String(res![index!].num)
             popup.titleMes = ">>"+String(res![index!].num)+"への返信"
@@ -662,16 +752,51 @@ class Manager {
                 popup.bodyMes += "\n"
                 popup.bodyMes += res![index!].body
             }
+            DispatchQueue.main.async {
+                view.present(popup, animated: true, completion: nil)
+            }
             
         }else if(board != nil){
-            
+            DispatchQueue.main.async {
+                view.present(popup, animated: true, completion: nil)
+            }
         }else if(thread != nil && index == nil){
-            popup.titleMes = "書き込み"
-        }
-        
-        
-        DispatchQueue.main.async {
-            view.present(popup, animated: true, completion: nil)
+            if(thread?[0] != nil){
+                popup.titleMes = "書き込み"
+                popup.onSend = {
+                    print(popup.nameField.text ?? "")
+                    print(popup.bodyField.text ?? "")
+//
+//                    Post.postResTo5ch(threadD: thread![0], postText:popup.bodyField.text , name: popup.nameField.text!, mail: popup.mailField.text!, onEnded: {
+//                        print($0)
+//                        let alert: UIAlertController = UIAlertController(title: "INFO", message: $0, preferredStyle:  UIAlertController.Style.alert)
+//
+//                        let defaultAction: UIAlertAction = UIAlertAction(title: "OK", style: UIAlertAction.Style.default, handler:{
+//                            // ボタンが押された時の処理を書く（クロージャ実装）
+//                            (action: UIAlertAction!) -> Void in
+//                            //print("OK")
+//                        })
+//                        // キャンセルボタン
+//                        let cancelAction: UIAlertAction = UIAlertAction(title: "キャンセル", style: UIAlertAction.Style.cancel, handler:{
+//                            // ボタンが押された時の処理を書く（クロージャ実装）
+//                            (action: UIAlertAction!) -> Void in
+//                            //print("Cancel")
+//                        })
+//
+//                        // ③ UIAlertControllerにActionを追加
+//                        alert.addAction(cancelAction)
+//                        alert.addAction(defaultAction)
+//                        view.present(alert, animated: true, completion: nil)
+//                    })
+                    
+                    popup.dismiss(animated: true, completion: nil)
+                }
+                DispatchQueue.main.async {
+                    view.present(popup, animated: true, completion: nil)
+                    popup.threadTitleHeight.constant = 0
+                    popup.threadTitle.isHidden = true
+                }
+            }
         }
     }
     
@@ -706,6 +831,11 @@ class Manager {
                     }
                 }
                 return cell!
+            }
+            
+            view.onOtherMenu = {
+                let othermenu = Manager.createHistoryTable(view: view)
+                view.navigationController?.pushViewController(othermenu!, animated: true)
             }
             
             DispatchQueue.main.async {

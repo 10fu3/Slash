@@ -312,20 +312,22 @@ class NewResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
             }
             
         }else if(url.absoluteString.hasPrefix("ghttp")){
-            let link = url.absoluteString.replacingOccurrences(of: "ghttp://", with: "http://").replacingOccurrences(of: "ghttps://", with: "https://").replacingOccurrences(of: "gttps://", with: "https://").replacingOccurrences(of: "gttp://", with: "http://")
-            if(link.hasSuffix(".png")||link.hasSuffix(".PNG")||link.hasSuffix(".jpg")||link.hasSuffix(".JPG")||link.hasSuffix(".gif")||link.hasSuffix(".GIF")){
-                guard let nextVC = nowview?.storyboard?.instantiateViewController(withIdentifier: "pictureview") as? PictureView else{
-                    return true
+            DispatchQueue.global().async {
+                let link = url.absoluteString.replacingOccurrences(of: "ghttp://", with: "http://").replacingOccurrences(of: "ghttps://", with: "https://").replacingOccurrences(of: "gttps://", with: "https://").replacingOccurrences(of: "gttp://", with: "http://")
+                if(link.hasSuffix(".png")||link.hasSuffix(".PNG")||link.hasSuffix(".jpg")||link.hasSuffix(".JPG")||link.hasSuffix(".gif")||link.hasSuffix(".GIF")){
+                    guard let nextVC = self.nowview?.storyboard?.instantiateViewController(withIdentifier: "pictureview") as? PictureView else{
+                        return
+                    }
+                    nextVC.urlString = link
+                    self.nowview?.present(nextVC, animated: true, completion: nil)
+                    
+                }else{
+                    guard let nextVC = self.nowview?.storyboard?.instantiateViewController(withIdentifier: "webview") as? WebView else{
+                        return
+                    }
+                    nextVC.url = link
+                    self.nowview?.present(nextVC, animated: true, completion: nil)
                 }
-                nextVC.urlString = link
-                nowview?.present(nextVC, animated: true, completion: nil)
-                
-            }else{
-                guard let nextVC = nowview?.storyboard?.instantiateViewController(withIdentifier: "webview") as? WebView else{
-                    return true
-                }
-                nextVC.url = link
-                nowview?.present(nextVC, animated: true, completion: nil)
             }
             return true
         }
@@ -366,7 +368,7 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
             return #colorLiteral(red: 0.05781959732, green: 0.7647058964, blue: 0.1966328562, alpha: 1)
         }
         if count >= 3{
-            return #colorLiteral(red: 1, green: 0, blue: 0.05610767772, alpha: 1)
+            return #colorLiteral(red: 0.9529411793, green: 0.6862745285, blue: 0.1333333403, alpha: 1)
         }else if count == 2{
             return #colorLiteral(red: 0.5568627715, green: 0.3529411852, blue: 0.9686274529, alpha: 1)
         }else if count == 1{
@@ -377,7 +379,7 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
     
     func getAnchorColor(count:Int) -> UIColor {
         if count >= 3{
-            return #colorLiteral(red: 1, green: 0, blue: 0.05610767772, alpha: 1)
+            return #colorLiteral(red: 0.9529411793, green: 0.6862745285, blue: 0.1333333403, alpha: 1)
         }else if count == 2{
             return #colorLiteral(red: 0.5568627715, green: 0.3529411852, blue: 0.9686274529, alpha: 1)
         }else if count == 1{
@@ -465,22 +467,36 @@ class ResponseCell: UITableViewCell ,UITextViewDelegate,TapbleCell{
             NSAttributedString.Key.foregroundColor: #colorLiteral(red: 0.2392156869, green: 0.6745098233, blue: 0.9686274529, alpha: 1)
         ]
         for url in data.urls{
-            var runUrl = url
+            let runUrl = url
             let range = NSString(string: attributedString.string).range(of: runUrl)
             attributedString.addAttribute(
                 NSAttributedString.Key.link,
                 value: "g"+runUrl,
                 range: range)
         }
-        for i in 0..<data.toRef.count{
-            //print(i.0)
-            let anchor = data.toRef[i]
-            let range = NSString(string: attributedString.string).range(of: anchor.0)
+        
+        let matches = Pattern.anchorRegex.matches(in: data.body, options: [], range: NSMakeRange(0, data.body.count))
+        
+        matches.forEach { (match) -> () in
+            let range = match.range(at: 1)
+            let anchor = (data.body as NSString).substring(with: match.range(at: 1))
             attributedString.addAttribute(
                 NSAttributedString.Key.link,
-                value: "res://"+anchor.1.map{String($0)}.joined(separator: "/"),
+                value: "res://"+anchor,
                 range: range)
         }
+        
+//        for i in 0..<data.toRef.count{
+//            //print(i.0)
+//            let anchor = data.toRef[i]
+//            
+//            let range = NSString(string: attributedString.string).range(of: anchor.0, options: .backwards)
+//            
+//            attributedString.addAttribute(
+//                NSAttributedString.Key.link,
+//                value: "res://"+anchor.1.map{String($0)}.joined(separator: "/"),
+//                range: range)
+//        }
 
         self.body.attributedText = attributedString
         self.date.text = data.date
@@ -571,11 +587,13 @@ class UIStatus {
     var mode:UIStatusEnum = .SERVER_LIST
 }
 
-enum UIStatusEnum {
+enum UIStatusEnum :String {
     case SERVER_LIST//鯖一覧
     case BOARD_LIST//板一覧
     case BOARD_FAV//お気に入り板
+    case HISTORY // 履歴
     case BOARD_HIS//閲覧履歴板
+    case WRITE_HIS//書込履歴
     case CATEGORY_LIST//カテゴリー一覧
     //case BIG_CATEGORY_LIST//カテゴリー一覧
     case THREAD//スレ一覧
@@ -637,6 +655,11 @@ class WebView :UIViewController, WKNavigationDelegate, WKUIDelegate{
     
     @IBOutlet weak var share: UIButton!
     
+    @IBOutlet weak var width: NSLayoutConstraint!
+    
+    @IBOutlet weak var height: NSLayoutConstraint!
+    
+    
     @IBAction func onBack(_ sender: Any) {
         self.webview.goBack()
     }
@@ -687,6 +710,10 @@ class WebView :UIViewController, WKNavigationDelegate, WKUIDelegate{
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5){
             self.outOfRangeBtn.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0.350390625)
         }
+        
+        var request = URLRequest(url: URL(string: url ?? "")!)
+        
+        self.webview.load(request)
     }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -707,6 +734,31 @@ class WebView :UIViewController, WKNavigationDelegate, WKUIDelegate{
         }
     }
     
+    // 端末の向き変更を検知
+    override func viewDidAppear(_ animated: Bool) {
+        NotificationCenter.default.addObserver(self, selector: #selector(self.onOrientationChange(notification:)),name: UIDevice.orientationDidChangeNotification, object: nil)
+    }
+    
+    // 向きが変わったらframeをセットしなおして再描画
+    @objc func onOrientationChange(notification: NSNotification){
+        //let tableContentHeight = table?.contentSize.height ?? 0
+        let width = self.view.safeAreaLayoutGuide.layoutFrame.width
+        let height = self.view.safeAreaLayoutGuide.layoutFrame.height
+        let small = width > height ? height : width
+        self.height.constant = small
+        self.width.constant = small
+        //self.height.constant = self.view.bounds.width
+    }
+    
+    override func viewDidLayoutSubviews() {
+        //self.view.layoutIfNeeded()
+        let width = self.view.safeAreaLayoutGuide.layoutFrame.width
+        let height = self.view.safeAreaLayoutGuide.layoutFrame.height
+        let small = width > height ? height : width
+        self.height.constant = small
+        self.width.constant = small
+    }
+    
     deinit{
         //消さないと、アプリが落ちる
         self.webview.removeObserver(self, forKeyPath: "estimatedProgress")
@@ -716,19 +768,34 @@ class WebView :UIViewController, WKNavigationDelegate, WKUIDelegate{
     
 }
 
-class postTable :UIViewController{
+class PostTable :UIViewController{
     
     
+    var onSend:(()->Void)? = nil
     var titleMes = ""
     var bodyMes = ""
     
-    @IBOutlet weak var sizeview:UIView!
+    func close() {
+        self.outOfRangeBtn.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0)
+        dismiss(animated: true, completion: nil)
+    }
+    
+    @objc func onClose(recognizer: UILongPressGestureRecognizer) {
+        close()
+    }
+    
+    
     
     @IBOutlet weak var titleBar: UILabel!
-
+    
+    @IBOutlet weak var threadTitle: UITextField!
+    
     @IBOutlet weak var nameField: UITextField!
     
     @IBOutlet weak var mailField: UITextField!
+    
+    @IBOutlet weak var threadTitleHeight: NSLayoutConstraint!
+    
     
     @IBOutlet weak var bodyField: UITextView!
     @IBOutlet weak var sendBtn: UIButton!
@@ -736,9 +803,16 @@ class postTable :UIViewController{
     @IBOutlet weak var outOfRangeBtn: UIButton!
     
     @IBAction func onOutOfRange(_ sender: Any) {
-        self.outOfRangeBtn.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0)
-        dismiss(animated: true, completion: nil)
+        close()
     }
+
+    @IBAction func onSendBtn(_ sender: Any) {
+        onSend?()
+    }
+    
+    
+    @IBOutlet weak var width: NSLayoutConstraint!
+    @IBOutlet weak var height: NSLayoutConstraint!
     
     override func viewDidLoad() {
         bodyField.text = bodyMes
@@ -752,6 +826,30 @@ class postTable :UIViewController{
         self.view.endEditing(true)
     }
     
+    // 端末の向き変更を検知
+    override func viewDidAppear(_ animated: Bool) {
+        NotificationCenter.default.addObserver(self, selector: #selector(self.onOrientationChange(notification:)),name: UIDevice.orientationDidChangeNotification, object: nil)
+    }
+    
+    // 向きが変わったらframeをセットしなおして再描画
+    @objc func onOrientationChange(notification: NSNotification){
+        //let tableContentHeight = table?.contentSize.height ?? 0
+        let width = self.view.safeAreaLayoutGuide.layoutFrame.width
+        let height = self.view.safeAreaLayoutGuide.layoutFrame.height
+        let small = width > height ? height : width
+        self.height.constant = small
+        self.width.constant = small
+        //self.height.constant = self.view.bounds.width
+    }
+    
+    override func viewDidLayoutSubviews() {
+        //self.view.layoutIfNeeded()
+        let width = self.view.safeAreaLayoutGuide.layoutFrame.width
+        let height = self.view.safeAreaLayoutGuide.layoutFrame.height
+        let small = width > height ? height : width
+        self.height.constant = small
+        self.width.constant = small
+    }
     
     
 }
@@ -769,6 +867,7 @@ class popupTable : UIViewController, UITableViewDelegate , UITableViewDataSource
     @IBOutlet weak var table: UITableView?
     
     @IBOutlet weak var height: NSLayoutConstraint!
+    @IBOutlet weak var width: NSLayoutConstraint!
     
     var displayView: [SaveTypeTag]?
     
@@ -791,42 +890,79 @@ class popupTable : UIViewController, UITableViewDelegate , UITableViewDataSource
 
     var parentData:SaveTypeTag? = nil
     
-    @IBAction func onTouchOutOfRange(_ sender: Any) {
+    func close() {
         self.outofrange.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0)
         dismiss(animated: true, completion: nil)
     }
+    
+    @objc func onClose(recognizer: UILongPressGestureRecognizer) {
+        close()
+    }
+    
+    @IBAction func onTouchOutOfRange(_ sender: Any) {
+        close()
+    }
 
+//    // 端末の向き変更を検知
 //    override func viewDidAppear(_ animated: Bool) {
-//        NotificationCenter.default.addObserver(self,selector: #selector(self.rotationChange(notification:)),name: UIDevice.orientationDidChangeNotification,object: nil)
-//    }
-//    
-//    @objc
-//    func rotationChange(notification: NSNotification){
-//        
-//        //safeAreaFrameが上の青い部分のCGRect.
-//        let safeAreaFrame = self.view.safeAreaLayoutGuide.layoutFrame
-//        let safeAreaHeight = safeAreaFrame.width
-//        let safeAreaWidth = safeAreaFrame.height
-//        
-//        outofrange.frame.size = CGSize(width: safeAreaWidth, height: safeAreaHeight )
-//        table?.frame.size = CGSize(width: safeAreaWidth, height: safeAreaHeight)
-//        table?.frame = CGRect(x: safeAreaFrame.origin.x, y: safeAreaWidth.origin.y, width: safeAreaWidth, height: safeAreaHeight)
-//        table?.setNeedsDisplay()
-//        table?.reloadData()
+//        NotificationCenter.default.addObserver(self, selector: #selector(self.onOrientationChange(notification:)),name: UIDevice.orientationDidChangeNotification, object: nil)
+//
+//        let tableContentHeight = table?.contentSize.height ?? 0
+//        let width = self.view.safeAreaLayoutGuide.layoutFrame.width
+//        let height = self.view.safeAreaLayoutGuide.layoutFrame.height
+//        let small = width > height ? height : width
+//        if(tableContentHeight > height){
+//            self.height.constant = small
+//        }else{
+//            self.height.constant = tableContentHeight
+//        }
+//        self.width.constant = small
 //    }
     
-    override func viewDidLayoutSubviews() {
-        self.view.layoutIfNeeded()
-        if(table?.contentSize.height ?? 0 < table?.frame.size.width ?? 0){
-            //            print(table?.contentSize.height ?? 0)
-            //            print(table?.frame.size.width)
-            self.height?.constant = self.table?.contentSize.height ?? 40
-            
-            //self.table?.isScrollEnabled = false
-            //table?.isScrollEnabled = false
+    // 向きが変わったらframeをセットしなおして再描画
+    @objc func onOrientationChange(notification: NSNotification){
+        let tableContentHeight = table?.contentSize.height ?? 0
+        let width = self.view.safeAreaLayoutGuide.layoutFrame.width
+        let height = self.view.safeAreaLayoutGuide.layoutFrame.height
+        let small = width > height ? height : width
+        if(tableContentHeight > height){
+            self.height.constant = small
         }else{
-            self.height?.constant = self.view.bounds.width
+            self.height.constant = tableContentHeight
         }
+        self.width.constant = small
+        //self.height.constant = self.view.bounds.width
+    }
+    
+//    private lazy var initViewLayout : Void = {
+//        self.table?.setNeedsLayout()
+//        self.table?.layoutIfNeeded()
+//        let tableContentHeight = table?.contentSize.height ?? 0
+//        let width = self.view.safeAreaLayoutGuide.layoutFrame.width
+//        let height = self.view.safeAreaLayoutGuide.layoutFrame.height
+//        let small = width > height ? height : width
+//        if(tableContentHeight > height){
+//            self.height.constant = small
+//        }else{
+//            self.height.constant = tableContentHeight
+//        }
+//        self.width.constant = small
+//    }()
+
+    override func viewDidLayoutSubviews() {
+        //super.viewDidLayoutSubviews()
+        self.table?.setNeedsLayout()
+        self.table?.layoutIfNeeded()
+        let tableContentHeight = table?.contentSize.height ?? 0
+        let width = self.view.safeAreaLayoutGuide.layoutFrame.width
+        let height = self.view.safeAreaLayoutGuide.layoutFrame.height
+        let small = width > height ? height : width
+        if(tableContentHeight > height){
+            self.height.constant = small
+        }else{
+            self.height.constant = tableContentHeight
+        }
+        self.width.constant = small
     }
     
     override func viewDidLoad() {
@@ -836,6 +972,10 @@ class popupTable : UIViewController, UITableViewDelegate , UITableViewDataSource
         self.table?.separatorInset = UIEdgeInsets.zero
         self.table?.rowHeight = UITableView.automaticDimension
         self.table?.estimatedRowHeight = UITableView.automaticDimension
+        self.table?.backgroundView?.addGestureRecognizer(
+            UITapGestureRecognizer(target: self, action: #selector(onClose(recognizer:))))
+        //self.width.constant = view.safeAreaLayoutGuide.layoutFrame.width
+        
         self.message.text = self.displayTitle
         
         // UILongPressGestureRecognizer宣言
@@ -901,6 +1041,10 @@ class ResponseEditView: UIViewController {
     
     @IBOutlet weak var outofrange: UIButton!
     
+    @IBOutlet weak var width: NSLayoutConstraint!
+    
+    @IBOutlet weak var height: NSLayoutConstraint!
+    
     var titleMes:String? = ""
     var bodyString:String? = ""
     
@@ -917,61 +1061,86 @@ class ResponseEditView: UIViewController {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         self.view.endEditing(true)
     }
+    
+    // 端末の向き変更を検知
+    override func viewDidAppear(_ animated: Bool) {
+        NotificationCenter.default.addObserver(self, selector: #selector(self.onOrientationChange(notification:)),name: UIDevice.orientationDidChangeNotification, object: nil)
+    }
+    
+    // 向きが変わったらframeをセットしなおして再描画
+    @objc func onOrientationChange(notification: NSNotification){
+        //let tableContentHeight = table?.contentSize.height ?? 0
+        let width = self.view.safeAreaLayoutGuide.layoutFrame.width
+        let height = self.view.safeAreaLayoutGuide.layoutFrame.height
+        let small = width > height ? height : width
+        self.height.constant = small
+        self.width.constant = small
+        //self.height.constant = self.view.bounds.width
+    }
+    
+    override func viewDidLayoutSubviews() {
+        //self.view.layoutIfNeeded()
+        let width = self.view.safeAreaLayoutGuide.layoutFrame.width
+        let height = self.view.safeAreaLayoutGuide.layoutFrame.height
+        let small = width > height ? height : width
+        self.height.constant = small
+        self.width.constant = small
+    }
 }
 
 class PictureView: UIViewController,UIScrollViewDelegate{
     
-    
     @IBOutlet weak var titleBar: UILabel!
     
+    @IBOutlet weak var imageView: UIImageView!
     @IBOutlet weak var scrollView: UIScrollView!
     
     @IBOutlet weak var outofrange: UIButton!
     
-    var imageView: UIImageView? = nil
+    @IBOutlet weak var height: NSLayoutConstraint!
+    
+    @IBOutlet weak var width: NSLayoutConstraint!
     
     var urlString:String? = ""
     
+    override func viewDidAppear(_ animated: Bool) {
+        NotificationCenter.default.addObserver(self, selector: #selector(self.onOrientationChange(notification:)),name: UIDevice.orientationDidChangeNotification, object: nil)
+    }
+    
+    // 向きが変わったらframeをセットしなおして再描画
+    @objc func onOrientationChange(notification: NSNotification){
+        //let tableContentHeight = table?.contentSize.height ?? 0
+        let width = self.view.safeAreaLayoutGuide.layoutFrame.width
+        let height = self.view.safeAreaLayoutGuide.layoutFrame.height
+        let small = width > height ? height : width
+        self.height.constant = small
+        self.width.constant = small
+        //self.height.constant = self.view.bounds.width
+    }
+    
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        return self.imageView
+        return imageView
     }
     
-    
-    
-    @objc func doubleTap(gesture:UITapGestureRecognizer) -> Void {
-        if(self.scrollView.zoomScale < 3){
-            let newScale:CGFloat = self.scrollView.zoomScale*3
-            let zoomRect:CGRect = self.zoomForScale(scale:newScale, center:gesture.location(in:gesture.view))
-            self.scrollView.zoom(to:zoomRect, animated: true)
-        } else {
-            self.scrollView.setZoomScale(1.0, animated: true)
-        }
+    func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        updateContentInset()
     }
     
-    func zoomForScale(scale:CGFloat, center: CGPoint) -> CGRect{
-        var zoomRect: CGRect = CGRect()
-        zoomRect.size.height = self.scrollView.frame.size.height / scale
-        zoomRect.size.width = self.scrollView.frame.size.width  / scale
-        zoomRect.origin.x = center.x - zoomRect.size.width / 2.0
-        zoomRect.origin.y = center.y - zoomRect.size.height / 2.0
-        return zoomRect
+    func updateContentInset() {
+        let widthInset = max((scrollView.frame.width - imageView.frame.width) / 2, 0)
+        let heightInset = max((scrollView.frame.height - imageView.frame.height) / 2, 0)
+        scrollView.contentInset = .init(top: heightInset,
+                                        left: widthInset,
+                                        bottom: heightInset,
+                                        right: widthInset)
     }
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        titleBar.text = "読み込み中..."
+        scrollView.minimumZoomScale = 1
+        scrollView.maximumZoomScale = 5
         scrollView.delegate = self
-        
-        scrollView.isUserInteractionEnabled = true
-        // 最大・最小の大きさを決める
-        scrollView.maximumZoomScale = 4.0
-        scrollView.minimumZoomScale = 1.0
-        scrollView.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0.350390625)
-        // ダブルタップ対応
-        let doubleTap = UITapGestureRecognizer(target:self,action:#selector(PictureView.doubleTap(gesture:)))
-        
-        doubleTap.numberOfTapsRequired = 2
-        
+        titleBar.text = "読み込み中..."
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5){
             self.outofrange.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0.350390625)
         }
@@ -981,14 +1150,11 @@ class PictureView: UIViewController,UIScrollViewDelegate{
                 if(data.image != nil){
                     let urls = self.urlString!.components(separatedBy: "/")
                     DispatchQueue.main.async {
-                        self.imageView = UIImageView()
+                        self.imageView?.contentMode = .scaleToFill
                         self.imageView?.image = data.image
-                        self.imageView?.frame = self.scrollView.frame
                         self.imageView?.isUserInteractionEnabled = true
-                        self.imageView?.addGestureRecognizer(doubleTap)
                         self.imageView?.contentMode = .scaleAspectFit
                         self.imageView?.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0.350390625)
-                        self.scrollView.addSubview(self.imageView ?? UIImageView())
                         self.titleBar.text = urls[urls.count-1]
                     }
                 }else{
@@ -999,8 +1165,6 @@ class PictureView: UIViewController,UIScrollViewDelegate{
             }
         }
     }
-    
-    
     
     @IBAction func onTouchOutOfRange(_ sender: Any) {
         self.outofrange.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 0)
@@ -1029,10 +1193,13 @@ class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIG
     @IBOutlet weak var ForthMenu: UIButton!
     
     @IBOutlet weak var FifthMenu: UIButton!
-    //ここまでが対象
+    
+    @IBOutlet weak var OtherMenu: UIBarButtonItem!
     
     //もしこのビューが一番最初にロードされるものだった（ルートビュー）ら有効にするフラグ
     var isFirst:Bool = true
+    
+    var isAutoScroll = false
     
     var parentData:SaveTypeTag? = nil
     
@@ -1048,6 +1215,8 @@ class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIG
     
     var onCellTouch: ((Int) -> Void)? = nil
     
+    var onDisappearView: [(() -> Void)] = []
+    
     var onCellLongTouch: ((CGPoint,CGPoint) -> Void)? = nil
     
     var cellGetter:((_ tag:String)->UITableViewCell?)? = nil
@@ -1060,8 +1229,17 @@ class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIG
     
     var menuInfo :[String] = ["","","","","","",""]
     
+    var onOtherMenu: (()->Void)? = nil
+    
+    var timer:Timer? = nil
+    
     override func viewWillAppear(_ animated: Bool) {
         self.progress.progress = 0
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        onDisappearView.forEach{$0()}
     }
     
     override func viewDidLoad() {
@@ -1073,12 +1251,20 @@ class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIG
         
         table?.delegate = self
         table?.dataSource = self
-        
         // UILongPressGestureRecognizer宣言
         let longPressRecognizer = UILongPressGestureRecognizer(target: self, action: #selector(cellLongPressed(recognizer:)))
         
+        self.FifthMenu.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(self.onLongBtnOf1(sender:))))
+        self.SecondMenu.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(self.onLongBtnOf2(sender:))))
+        self.ThirdMenu.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(self.onLongBtnOf3(sender:))))
+        self.ForthMenu.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(self.onLongBtnOf4(sender:))))
+        self.FifthMenu.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(self.onLongBtnOf5(sender:))))
+
+        
+        
         // `UIGestureRecognizerDelegate`を設定するのをお忘れなく
         longPressRecognizer.delegate = self
+        
         
         // tableViewにrecognizerを設定
         table?.addGestureRecognizer(longPressRecognizer)
@@ -1096,7 +1282,7 @@ class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIG
         
         //レスモードのときは上のメニューバーを閉じる
         if(tableMode != nil){
-            if(tableMode! == .THREAD){
+            if(tableMode! == .THREAD || tableMode!.rawValue.contains("HIS")){
                 self.progress.isHidden = false
             }else{
                 self.progress.isHidden = true
@@ -1116,6 +1302,7 @@ class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIG
         ForthMenu.setTitle(menuInfo[4], for: .normal)
         FifthMenu.titleLabel?.adjustsFontSizeToFitWidth = true
         FifthMenu.setTitle(menuInfo[5], for: .normal)
+        
         
         //Navigational
         let label = UILabel(frame: CGRect(x:0, y:0, width:400, height:50))
@@ -1189,20 +1376,35 @@ class SuperTable: UIViewController,UITableViewDelegate,UITableViewDataSource,UIG
     }
     
     
-    @IBAction func onLongBtnOf1(_ sender: Any) {
-        onMenuLongTouch[1]?(self)
+    @objc func onLongBtnOf1(sender: UILongPressGestureRecognizer) {
+        if(sender.state == UIGestureRecognizer.State.ended){
+            onMenuLongTouch[1]?(self)
+        }
     }
-    @IBAction func onLongBtnOf2(_ sender: Any) {
-        onMenuLongTouch[2]?(self)
+    @objc func onLongBtnOf2(sender: UILongPressGestureRecognizer) {
+        if(sender.state == UIGestureRecognizer.State.ended){
+            onMenuLongTouch[2]?(self)
+        }
     }
-    @IBAction func onLongBtnOf3(_ sender: Any) {
-        onMenuLongTouch[3]?(self)
+    @objc func onLongBtnOf3(sender: UILongPressGestureRecognizer) {
+        if(sender.state == UIGestureRecognizer.State.ended){
+            onMenuLongTouch[3]?(self)
+        }
     }
-    @IBAction func onLongBtnOf4(_ sender: Any) {
-        onMenuLongTouch[4]?(self)
+    @objc func onLongBtnOf4(sender: UILongPressGestureRecognizer) {
+        if(sender.state == UIGestureRecognizer.State.ended){
+            onMenuLongTouch[4]?(self)
+        }
     }
-    @IBAction func onLongBtnOf5(_ sender: Any) {
-        onMenuLongTouch[5]?(self)
+    @objc func onLongBtnOf5(sender: UILongPressGestureRecognizer) {
+        if(sender.state == UIGestureRecognizer.State.ended){
+            onMenuLongTouch[5]?(self)
+        }
     }
+    
+    @IBAction func onOtherMenu(_ sender: Any) {
+        onOtherMenu?()
+    }
+    
 }
 

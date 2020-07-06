@@ -9,6 +9,13 @@
 import Foundation
 import UIKit
 
+extension CharacterSet {
+    static let rfc3986Unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+}
+
+extension String.Encoding {
+    static let windows31j = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.dosJapanese.rawValue)))
+}
 extension String {
     
     init(htmlEncodedString: String) {
@@ -30,6 +37,94 @@ extension String {
             print("Error: \(error)")
             self = htmlEncodedString
         }
+    }
+    
+    func addingPercentEncoding(withAllowedCharacters characterSet: CharacterSet, using encoding: String.Encoding) -> String {
+        let stringData = self.data(using: encoding, allowLossyConversion: true) ?? Data()
+        let percentEscaped = stringData.map {byte->String in
+            if characterSet.contains(UnicodeScalar(byte)) {
+                return String(UnicodeScalar(byte))
+            } else if byte == UInt8(ascii: " ") {
+                return "+"
+            } else {
+                return String(format: "%%%02X", byte)
+            }
+            }.joined()
+        return percentEscaped
+    }
+    
+    var sjisPercentEncoded: String {
+        return self.addingPercentEncoding(withAllowedCharacters: .rfc3986Unreserved,  using: .windows31j)
+    }
+    public func distanceJaroWinkler(target: String) -> Double {
+        if self.count == 0 && target.count == 0 {
+            return 1.0
+        }
+        
+        let matchingWindowSize = max(self.count, target.count) / 2 - 1
+        var selfFlags = Array(repeating: false, count: self.count)
+        var targetFlags = Array(repeating: false, count: target.count)
+        
+        // Count matching characters.
+        var m: Double = 0
+        let array = self.map{String($0)}
+        let targetarray = target.map{String($0)}
+        for i in 0..<self.count {
+            let left = max(0, i - matchingWindowSize)
+            let right = min(target.count - 1, i + matchingWindowSize)
+            
+            if left <= right {
+                for j in left...right {
+                    // Already has a match, or does not match
+                    if targetFlags[j] || array[i] != targetarray[j] {
+                        continue;
+                    }
+                    
+                    m += 1
+                    selfFlags[i] = true
+                    targetFlags[j] = true
+                    break
+                }
+            }
+        }
+        
+        if m == 0.0 {
+            return 0.0
+        }
+        
+        // Count transposition.
+        var t: Double = 0
+        var k = 0
+        for i in 0..<self.count {
+            if (selfFlags[i] == false) {
+                continue
+            }
+            while (targetFlags[k] == false) {
+                k += 1
+            }
+            if (array[i] != targetarray[k]) {
+                t += 1
+            }
+            k += 1
+        }
+        t /= 2.0
+        
+        // Count common prefix.
+        var l: Double = 0
+        for i in 0..<4 {
+            if array[i] == targetarray[i] {
+                l += 1
+            } else {
+                break
+            }
+        }
+        
+        let dj = (m / Double(self.count) + m / Double(target.count) + (m - t) / m) / 3
+        
+        let p = 0.1
+        let dw = dj + l * p * (1 - dj)
+        
+        return dw;
     }
 }
 
@@ -196,6 +291,97 @@ class Pattern {
 
 }
 
+class Post{
+    static func postThreadTo5ch(_ board:Board, _ title: String,_ comment:String,_ name:String,_ mail:String, _ onEnded:((String?)->Void)?) {
+        let targetUrl = board.url+"test/bbs.cgi"
+        let parseurl = board.url.components(separatedBy: "/")
+        let boardid = parseurl[parseurl.count-1]
+        let headers: HTTPHeaders = [
+            "Referer": board.url,
+            "Accept-Encoding": "gzip",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Charset": "ISO-8859-1,utf-8;q=0.7,*;q=0.3",
+            "Accept-Language": "en-US,en;q=0.8",
+            "Connection": "keep-alive"
+        ]
+        let parameters: [String: Any] = [
+            "bbs": boardid,
+            //"key": thread,
+            "time": Int(Date().timeIntervalSince1970) - 60,
+            "FROM": name,
+            "subject": title,
+            "mail": mail,
+            "MESSAGE": comment,
+            "submit": "書き込む"
+        ]
+        AF.request(targetUrl, method: .post, parameters: parameters, encoding: URLEncoding.default, headers: headers).responseString { response in
+            // 初回アクセス時のみクッキーを設定する
+            if response.description.contains("書き込み確認") {
+                let res = response.response
+                let cookies = HTTPCookie.cookies(withResponseHeaderFields: res?.allHeaderFields as! [String : String], for: (res?.url!)!)
+                
+                Session.default.session.configuration.httpCookieStorage?.setCookies(cookies, for: response.response?.url, mainDocumentURL: nil)
+                // クッキーを設定してもう一回投稿！
+                AF.request(targetUrl, method: .post, parameters: parameters, encoding: URLEncoding.default, headers: headers).responseString { endedresponse in
+                    onEnded?(endedresponse.result.success)
+                }
+            }
+        }
+        print(targetUrl)
+    }
+    
+    static func postResTo5ch(_ urlString: String, _ postText: String, _ onEnded:((String?)->Void)?) {
+        
+        let url     = URL(string: urlString)
+        let domain  = (url?.host)!  // ドメイン
+        
+        let subStrings  = domain.components(separatedBy: ".")
+        let server      = subStrings[0] // サーバー
+        
+        let paths   = (urlString+"/").components(separatedBy: "/")
+        let thread  = paths[paths.count-2]  // スレッド
+        let board   = paths[paths.count-3]  // 掲示板種別
+        
+        let bbsUrl  = "https://\(server).5ch.net/test/bbs.cgi"  // 投稿先CGI
+        
+        let headers: HTTPHeaders = [
+            "Referer": urlString,
+            "Accept-Encoding": "gzip",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Charset": "ISO-8859-1,utf-8;q=0.7,*;q=0.3",
+            "Accept-Language": "en-US,en;q=0.8",
+            "Connection": "keep-alive",
+            "Cookie":"yuki=akari"
+        ]
+        let parameters: [String: Any] = [
+            "bbs": board,
+            "key": thread,
+            "time": Int(Date().timeIntervalSince1970) - 60,
+            "FROM": "",
+            "subject": "",
+            "mail": "",
+            "MESSAGE": postText.sjisPercentEncoded,
+            "submit": "書き込む".sjisPercentEncoded
+        ]
+        
+        AF.request(bbsUrl, method: .post, parameters: parameters, encoding: URLEncoding.default, headers: headers).responseString { response in
+            // 初回アクセス時のみクッキーを設定する
+            if response.description.contains("書き込み確認") {
+                let res = response.response
+                let cookies = HTTPCookie.cookies(withResponseHeaderFields: res?.allHeaderFields as! [String : String], for: (res?.url!)!)
+                
+                Session.default.session.configuration.httpCookieStorage?.setCookies(cookies, for: response.response?.url, mainDocumentURL: nil)
+                // クッキーを設定してもう一回投稿！
+                AF.request(bbsUrl, method: .post, parameters: parameters, encoding: URLEncoding.default, headers: headers).responseString { endedresponse in
+                    onEnded?(endedresponse.result.success)
+                }
+            }
+        }
+    }
+}
+
 class Parse {
     let jpDateFormater = DateFormatter()
     
@@ -205,6 +391,7 @@ class Parse {
         //jpDateFormater.dateFormat = "2019/06/20(木) 17:52:45.61"
         
     }
+    
     static func setRelationParentRes(raw:[Res]) -> [Res] {
         
         let refres = raw.filter{$0.toRef.count > 0}
@@ -260,7 +447,7 @@ class Parse {
         
         f = {(res:Res,deepLev:Int) -> () in
             //var cache = Res()
-            if(deepLev > 100){
+            if(deepLev > 50){
                 return
             }
             for i in res.treeChildren{
@@ -275,10 +462,6 @@ class Parse {
                     continue
                 }
                 pick.treeDepth = deepLev
-                if(pick.treeParent.count >= 2){
-                    display.append(pick)
-                    continue
-                }
                 if(pick.treeChildren.count > 0){
                     display.append(pick)
                     f!(pick,deepLev+1)
@@ -349,10 +532,6 @@ class Parse {
                 
                 
                 pick.treeDepth = deepLev
-                if(pick.treeParent.count >= 2){
-                    values.append(pick)
-                    continue
-                }
                 if(pick.treeChildren.count > 0){
                     values.append(pick)
                     f!(pick,deepLev+1)
@@ -457,6 +636,7 @@ class Parse {
             }
             if(datAndTitle.count == 2){
                 let thread = Thread()
+                thread.boardID = board.name
                 thread.id = String(datAndTitle[0].prefix(datAndTitle[0].count-4))
                 thread.resCount = Pattern().getResCount(data: datAndTitle[1])
                 thread.date = Date.init(timeIntervalSince1970: TimeInterval(Double(thread.id) ?? 0))

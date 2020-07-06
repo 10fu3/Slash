@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import RealmSwift
 
 enum SaveType: String {
     case SERVERNAME = "SERVER"
@@ -16,6 +15,20 @@ enum SaveType: String {
     case THREAD = "THREAD"
     case RESPONSE = "RESPONSE"
     case NG = "NG"
+}
+
+class NG{
+    enum NGType {
+        case Res
+        case Thread
+        case ID
+        case CopyPase
+        case ShareID
+    }
+    enum NGJudgeType {
+        case Regex
+        case Contains
+    }
 }
 
 class TableFilter {
@@ -133,6 +146,7 @@ class Thread:SaveTypeTag {
     }
     
     init(savedata:SaveObject) {
+        
         self.title = savedata.title
         self.savetype = .THREAD
         self.url = savedata.url
@@ -176,6 +190,7 @@ class Thread:SaveTypeTag {
         return savedata
     }
     
+    var boardID = ""
     var savetype: SaveType = .THREAD
     var title = ""
     var isDown = false
