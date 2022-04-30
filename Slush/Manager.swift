@@ -90,15 +90,15 @@ class SearchFilter {
 class Manager {
     static let manager = Manager()
     
-    let realm:Realm
+    //let realm:Realm
     var downloadedData = [Server]()
     
     var views = [SuperTable]()
     
     init() {
-        var config = Realm.Configuration()
-        config.deleteRealmIfMigrationNeeded = true
-        realm = try! Realm(configuration: config)
+//        var config = Realm.Configuration()
+//        config.deleteRealmIfMigrationNeeded = true
+//        realm = try! Realm(configuration: config)
     }
 
 //    static func createServerTable(view:SuperTable,data:SaveTypeTag) -> UIViewController? {

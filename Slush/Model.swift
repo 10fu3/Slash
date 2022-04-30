@@ -47,11 +47,11 @@ class Server:SaveTypeTag {
         self.savetype = .SERVERNAME
         self.title = savedata.title
         let predicate = NSPredicate(format: "dataType == %@","CATEGORY")
-        let objs = Manager.manager.realm.objects(SaveObject.self).filter(predicate)
-        objs.forEach{
-            let cat = Category(savedata: $0)
-            self.bigcategory.append(cat)
-        }
+//        let objs = Manager.manager.realm.objects(SaveObject.self).filter(predicate)
+//        objs.forEach{
+//            let cat = Category(savedata: $0)
+//            self.bigcategory.append(cat)
+//        }
         
 
     }
@@ -75,11 +75,11 @@ class Category:SaveTypeTag {
         self.title = savedata.title
         self.savetype = .CATEGORY
         let predicate = NSPredicate(format: "dataType == %@","BOARD")
-        let objs = Manager.manager.realm.objects(SaveObject.self).filter(predicate)
-        objs.forEach{
-            let board = Board(savedata: $0)
-            self.boards.append(board)
-        }
+//        let objs = Manager.manager.realm.objects(SaveObject.self).filter(predicate)
+//        objs.forEach{
+//            let board = Board(savedata: $0)
+//            self.boards.append(board)
+//        }
     }
     
     var savetype: SaveType = .CATEGORY
@@ -100,11 +100,11 @@ class Board:SaveTypeTag {
         self.title = savedata.title
         self.savetype = .BOARD
         let predicate = NSPredicate(format: "dataType == %@","THREAD")
-        let objs = Manager.manager.realm.objects(SaveObject.self).filter(predicate)
-        objs.forEach{
-            let thread = Thread(savedata: $0)
-            self.cache.append(thread)
-        }
+//        let objs = Manager.manager.realm.objects(SaveObject.self).filter(predicate)
+//        objs.forEach{
+//            let thread = Thread(savedata: $0)
+//            self.cache.append(thread)
+//        }
     }
     
     var name = ""
@@ -156,11 +156,11 @@ class Thread:SaveTypeTag {
         self.id = savedata.value
         
         let predicate = NSPredicate(format: "dataType == %@","RESPONSE")
-        let objs = Manager.manager.realm.objects(SaveObject.self).filter(predicate)
-        objs.forEach{
-            let res = Res(savedata: $0)
-            self.res.append(res)
-        }
+//        let objs = Manager.manager.realm.objects(SaveObject.self).filter(predicate)
+//        objs.forEach{
+//            let res = Res(savedata: $0)
+//            self.res.append(res)
+//        }
         self.res = Parse.setRelationParentRes(raw: self.res)
     }
     
@@ -294,33 +294,30 @@ class Res:SaveTypeTag {
 
 
 
-class SaveObject: Object {//保存する際に共通化するオブジェクト
-    @objc var fav = false
-    @objc var writterId = ""
-    @objc var dataType = "SERVER"
-    @objc var date = ""
+class SaveObject {//保存する際に共通化するオブジェクト
+    var fav = false
+    var writterId = ""
+    var dataType = "SERVER"
+    var date = ""
     
-    @objc var num = 0//レス番
-    @objc var url = ""//URL
-    @objc var tag = ""//所属先
-    @objc var title = ""//件名
-    @objc var name = ""//書き込んだやつの名前
-    @objc var value = ""//本文
-    @objc var lastRead = 0
-    @objc dynamic var down:Bool = false
+    var num = 0//レス番
+    var url = ""//URL
+    var tag = ""//所属先
+    var title = ""//件名
+    var name = ""//書き込んだやつの名前
+    var value = ""//本文
+    var lastRead = 0
+    var down:Bool = false
     
-    @objc dynamic var key:String = UUID.init().uuidString
+    var key:String = UUID.init().uuidString
     
-    override static func primaryKey() -> String? {
-        return "key"
-    }
     
     func save() {
-        DispatchQueue.main.async {
-            try! Manager.manager.realm.write {
-                Manager.manager.realm.add(self, update: true)
-            }
-        }
+//        DispatchQueue.main.async {
+//            try! Manager.manager.realm.write {
+//                Manager.manager.realm.add(self, update: true)
+//            }
+//        }
     }
 }
 

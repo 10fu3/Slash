@@ -291,96 +291,96 @@ class Pattern {
 
 }
 
-class Post{
-    static func postThreadTo5ch(_ board:Board, _ title: String,_ comment:String,_ name:String,_ mail:String, _ onEnded:((String?)->Void)?) {
-        let targetUrl = board.url+"test/bbs.cgi"
-        let parseurl = board.url.components(separatedBy: "/")
-        let boardid = parseurl[parseurl.count-1]
-        let headers: HTTPHeaders = [
-            "Referer": board.url,
-            "Accept-Encoding": "gzip",
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Charset": "ISO-8859-1,utf-8;q=0.7,*;q=0.3",
-            "Accept-Language": "en-US,en;q=0.8",
-            "Connection": "keep-alive"
-        ]
-        let parameters: [String: Any] = [
-            "bbs": boardid,
-            //"key": thread,
-            "time": Int(Date().timeIntervalSince1970) - 60,
-            "FROM": name,
-            "subject": title,
-            "mail": mail,
-            "MESSAGE": comment,
-            "submit": "書き込む"
-        ]
-        AF.request(targetUrl, method: .post, parameters: parameters, encoding: URLEncoding.default, headers: headers).responseString { response in
-            // 初回アクセス時のみクッキーを設定する
-            if response.description.contains("書き込み確認") {
-                let res = response.response
-                let cookies = HTTPCookie.cookies(withResponseHeaderFields: res?.allHeaderFields as! [String : String], for: (res?.url!)!)
-                
-                Session.default.session.configuration.httpCookieStorage?.setCookies(cookies, for: response.response?.url, mainDocumentURL: nil)
-                // クッキーを設定してもう一回投稿！
-                AF.request(targetUrl, method: .post, parameters: parameters, encoding: URLEncoding.default, headers: headers).responseString { endedresponse in
-                    onEnded?(endedresponse.result.success)
-                }
-            }
-        }
-        print(targetUrl)
-    }
-    
-    static func postResTo5ch(_ urlString: String, _ postText: String, _ onEnded:((String?)->Void)?) {
-        
-        let url     = URL(string: urlString)
-        let domain  = (url?.host)!  // ドメイン
-        
-        let subStrings  = domain.components(separatedBy: ".")
-        let server      = subStrings[0] // サーバー
-        
-        let paths   = (urlString+"/").components(separatedBy: "/")
-        let thread  = paths[paths.count-2]  // スレッド
-        let board   = paths[paths.count-3]  // 掲示板種別
-        
-        let bbsUrl  = "https://\(server).5ch.net/test/bbs.cgi"  // 投稿先CGI
-        
-        let headers: HTTPHeaders = [
-            "Referer": urlString,
-            "Accept-Encoding": "gzip",
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Charset": "ISO-8859-1,utf-8;q=0.7,*;q=0.3",
-            "Accept-Language": "en-US,en;q=0.8",
-            "Connection": "keep-alive",
-            "Cookie":"yuki=akari"
-        ]
-        let parameters: [String: Any] = [
-            "bbs": board,
-            "key": thread,
-            "time": Int(Date().timeIntervalSince1970) - 60,
-            "FROM": "",
-            "subject": "",
-            "mail": "",
-            "MESSAGE": postText.sjisPercentEncoded,
-            "submit": "書き込む".sjisPercentEncoded
-        ]
-        
-        AF.request(bbsUrl, method: .post, parameters: parameters, encoding: URLEncoding.default, headers: headers).responseString { response in
-            // 初回アクセス時のみクッキーを設定する
-            if response.description.contains("書き込み確認") {
-                let res = response.response
-                let cookies = HTTPCookie.cookies(withResponseHeaderFields: res?.allHeaderFields as! [String : String], for: (res?.url!)!)
-                
-                Session.default.session.configuration.httpCookieStorage?.setCookies(cookies, for: response.response?.url, mainDocumentURL: nil)
-                // クッキーを設定してもう一回投稿！
-                AF.request(bbsUrl, method: .post, parameters: parameters, encoding: URLEncoding.default, headers: headers).responseString { endedresponse in
-                    onEnded?(endedresponse.result.success)
-                }
-            }
-        }
-    }
-}
+//class Post{
+//    static func postThreadTo5ch(_ board:Board, _ title: String,_ comment:String,_ name:String,_ mail:String, _ onEnded:((String?)->Void)?) {
+//        let targetUrl = board.url+"test/bbs.cgi"
+//        let parseurl = board.url.components(separatedBy: "/")
+//        let boardid = parseurl[parseurl.count-1]
+//        let headers: HTTPHeaders = [
+//            "Referer": board.url,
+//            "Accept-Encoding": "gzip",
+//            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11",
+//            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+//            "Accept-Charset": "ISO-8859-1,utf-8;q=0.7,*;q=0.3",
+//            "Accept-Language": "en-US,en;q=0.8",
+//            "Connection": "keep-alive"
+//        ]
+//        let parameters: [String: Any] = [
+//            "bbs": boardid,
+//            //"key": thread,
+//            "time": Int(Date().timeIntervalSince1970) - 60,
+//            "FROM": name,
+//            "subject": title,
+//            "mail": mail,
+//            "MESSAGE": comment,
+//            "submit": "書き込む"
+//        ]
+//        AF.request(targetUrl, method: .post, parameters: parameters, encoding: URLEncoding.default, headers: headers).responseString { response in
+//            // 初回アクセス時のみクッキーを設定する
+//            if response.description.contains("書き込み確認") {
+//                let res = response.response
+//                let cookies = HTTPCookie.cookies(withResponseHeaderFields: res?.allHeaderFields as! [String : String], for: (res?.url!)!)
+//
+//                Session.default.session.configuration.httpCookieStorage?.setCookies(cookies, for: response.response?.url, mainDocumentURL: nil)
+//                // クッキーを設定してもう一回投稿！
+//                AF.request(targetUrl, method: .post, parameters: parameters, encoding: URLEncoding.default, headers: headers).responseString { endedresponse in
+//                    onEnded?(endedresponse.result.success)
+//                }
+//            }
+//        }
+//        print(targetUrl)
+//    }
+//
+//    static func postResTo5ch(_ urlString: String, _ postText: String, _ onEnded:((String?)->Void)?) {
+//
+//        let url     = URL(string: urlString)
+//        let domain  = (url?.host)!  // ドメイン
+//
+//        let subStrings  = domain.components(separatedBy: ".")
+//        let server      = subStrings[0] // サーバー
+//
+//        let paths   = (urlString+"/").components(separatedBy: "/")
+//        let thread  = paths[paths.count-2]  // スレッド
+//        let board   = paths[paths.count-3]  // 掲示板種別
+//
+//        let bbsUrl  = "https://\(server).5ch.net/test/bbs.cgi"  // 投稿先CGI
+//
+//        let headers: HTTPHeaders = [
+//            "Referer": urlString,
+//            "Accept-Encoding": "gzip",
+//            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11",
+//            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+//            "Accept-Charset": "ISO-8859-1,utf-8;q=0.7,*;q=0.3",
+//            "Accept-Language": "en-US,en;q=0.8",
+//            "Connection": "keep-alive",
+//            "Cookie":"yuki=akari"
+//        ]
+//        let parameters: [String: Any] = [
+//            "bbs": board,
+//            "key": thread,
+//            "time": Int(Date().timeIntervalSince1970) - 60,
+//            "FROM": "",
+//            "subject": "",
+//            "mail": "",
+//            "MESSAGE": postText.sjisPercentEncoded,
+//            "submit": "書き込む".sjisPercentEncoded
+//        ]
+//
+//        AF.request(bbsUrl, method: .post, parameters: parameters, encoding: URLEncoding.default, headers: headers).responseString { response in
+//            // 初回アクセス時のみクッキーを設定する
+//            if response.description.contains("書き込み確認") {
+//                let res = response.response
+//                let cookies = HTTPCookie.cookies(withResponseHeaderFields: res?.allHeaderFields as! [String : String], for: (res?.url!)!)
+//
+//                Session.default.session.configuration.httpCookieStorage?.setCookies(cookies, for: response.response?.url, mainDocumentURL: nil)
+//                // クッキーを設定してもう一回投稿！
+//                AF.request(bbsUrl, method: .post, parameters: parameters, encoding: URLEncoding.default, headers: headers).responseString { endedresponse in
+//                    onEnded?(endedresponse.result.success)
+//                }
+//            }
+//        }
+//    }
+//}
 
 class Parse {
     let jpDateFormater = DateFormatter()

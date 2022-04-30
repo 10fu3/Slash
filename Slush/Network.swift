@@ -38,7 +38,7 @@ public class HttpClientImpl{
     public func convertImage(url:String) -> (data:Data,image:UIImage?) {
         let data = getDatafromHTTP(url: url)
         if(url.hasSuffix(".gif")){
-            return (data,UIImage.gif(data: data))
+            //return (data,UIImage.gif(data: data))
         }
         
         return (data,UIImage(data: data) ?? UIImage())
